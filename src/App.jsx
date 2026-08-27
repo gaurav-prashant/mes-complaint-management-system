@@ -1,5 +1,5 @@
-import React from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import React, { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Hero from './components/Hero'
 import Stats from './components/Stats'
@@ -15,6 +15,14 @@ import SuperAdminDashboard from './components/SuperAdminDashboard'
 
 import CTA from './components/CTA'
 
+function RouteLogger() {
+  const location = useLocation();
+  useEffect(() => {
+    console.log('[ROUTE DEBUG] Current pathname:', location.pathname);
+  }, [location]);
+  return null;
+}
+
 function Home() {
   return (
     <>
@@ -29,6 +37,7 @@ function Home() {
 function App() {
   return (
     <BrowserRouter>
+      <RouteLogger />
       <div className="app-container" style={{ background: '#f7f9fc', minHeight: '100vh', width: '100%', maxWidth: '100vw', overflowX: 'hidden', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
         <Navbar />
         <div style={{ flex: 1 }}>
