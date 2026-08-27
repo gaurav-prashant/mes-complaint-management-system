@@ -50,6 +50,9 @@ async function connectDB() {
   }
 }
 
+console.log(`[Server Init] NODE_ENV: ${process.env.NODE_ENV || 'development'} | NETLIFY: ${Boolean(process.env.NETLIFY || process.env.LAMBDA_TASK_ROOT)}`);
+console.log(`[Server Init] Config Check — ADMIN_EMAIL: ${Boolean(ADMIN_EMAIL)}, ADMIN_PASSWORD: ${Boolean(ADMIN_PASSWORD)}, MONGO_URI: ${Boolean(MONGO_URI)}`);
+
 // Request logging middleware for debugging serverless invocations
 app.use((req, res, next) => {
   console.log(`[API Request] ${req.method} ${req.originalUrl || req.url}`);
@@ -81,14 +84,15 @@ app.use(async (req, res, next) => {
 // Admin Login (supports both /api/admin/login and /admin/login)
 app.post(['/api/admin/login', '/admin/login'], (req, res) => {
   const { email, password } = req.body || {};
-  console.log(`[Admin Login Attempt] Email: ${email || 'N/A'}`);
+  console.log(`[Admin Login Attempt] Method: ${req.method} | Path: ${req.url} | Email received: "${email || ''}"`);
+  console.log(`[Admin Login Config] ADMIN_EMAIL set: ${Boolean(ADMIN_EMAIL)} | ADMIN_PASSWORD set: ${Boolean(ADMIN_PASSWORD)} | MONGO_URI set: ${Boolean(MONGO_URI)}`);
 
   if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-    console.log(`[Admin Login Success] Auth successful for: ${email}`);
-    res.json({ success: true, token: 'fake-jwt-token-12345' });
+    console.log(`[Admin Login Success] Auth successful for email: "${email}"`);
+    return res.json({ success: true, token: 'fake-jwt-token-12345' });
   } else {
-    console.log(`[Admin Login Failed] Invalid credentials for: ${email}`);
-    res.status(401).json({ success: false, message: 'Invalid email or password' });
+    console.log(`[Admin Login Failed] Credentials mismatch for email: "${email}"`);
+    return res.status(401).json({ success: false, message: 'Invalid email or password' });
   }
 });
 
@@ -195,6 +199,26 @@ app.post(['/api/complaints', '/complaints'], async (req, res) => {
     console.error('Error adding complaint:', error);
     res.status(500).json({ success: false, message: 'Failed to submit complaint' });
   }
+});
+
+// Fallback 404 handler (returns JSON instead of HTML for unmatched API routes)
+app.use((req, res) => {
+  console.log(`[API 404 Fallback] Unmatched route: ${req.method} ${req.originalUrl || req.url}`);
+  res.status(404).json({
+    success: false,
+    message: `API endpoint not found: ${req.method} ${req.originalUrl || req.url}`,
+    method: req.method,
+    path: req.url
+  });
+});
+
+// Fallback 500 error handler (returns JSON for uncaught server errors)
+app.use((err, req, res, next) => {
+  console.error('[API 500 Error]', err);
+  res.status(500).json({
+    success: false,
+    message: err.message || 'Internal Server Error'
+  });
 });
 
 if (process.env.NETLIFY !== 'true' && !process.env.LAMBDA_TASK_ROOT) {
