@@ -50,11 +50,27 @@ async function connectDB() {
   }
 }
 
+// URL Path Normalization Middleware for Netlify Functions & local dev compatibility
+app.use((req, res, next) => {
+  if (req.url.startsWith('/.netlify/functions/api')) {
+    req.url = req.url.replace('/.netlify/functions/api', '') || '/';
+  }
+  if (!req.url.startsWith('/api')) {
+    req.url = '/api' + req.url;
+  }
+  next();
+});
+
 // Connect eagerly for local dev and attach middleware for serverless invocations
 connectDB();
 app.use(async (req, res, next) => {
-  if (!complaintsCollection) {
-    await connectDB();
+  // Do not block admin login if DB is connecting or unavailable
+  if (!complaintsCollection && !req.url.includes('/admin/login')) {
+    try {
+      await connectDB();
+    } catch (dbErr) {
+      console.error('Middleware DB connection error:', dbErr);
+    }
   }
   next();
 });
