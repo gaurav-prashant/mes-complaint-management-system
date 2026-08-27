@@ -4598,107 +4598,51 @@ a {
   }
 }
 
-/* ── Admin Dashboard Footer & Logout ─────────────────────────── */
-.adm-dashboard-footer {
-  background: #0f172a;
-  color: #ffffff;
-  border-top: 1px solid #1e293b;
-  padding: 32px 32px 40px;
-  margin-top: 40px;
+/* ── Admin Dashboard Account & Logout Section ─────────────────── */
+.adm-account-section {
+  text-align: center !important;
+  margin: 40px auto 50px !important;
+  padding: 24px 20px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
-.adm-footer-content {
-  max-width: 1360px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  flex-wrap: wrap;
-}
-
-.adm-footer-info {
-  max-width: 500px;
-}
-
-.adm-footer-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 18px;
-  font-weight: 800;
-  color: #ffffff;
-  margin-bottom: 8px;
-}
-
-.adm-footer-sub {
-  font-size: 13.5px;
-  color: #94a3b8;
-  margin: 0;
-  line-height: 1.5;
-}
-
-.adm-footer-help-section {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  padding: 20px 24px;
-}
-
-.adm-footer-help-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: #ffffff;
-  margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.adm-footer-help-text {
-  font-size: 13.5px;
-  color: #cbd5e1;
-  margin: 0 0 8px 0;
+.adm-account-heading {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  color: #1e293b !important;
+  margin-bottom: 14px !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .adm-footer-logout-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 22px;
-  background: #dc2626;
-  color: #ffffff;
-  border: 1px solid #ef4444;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
-  font-family: inherit;
+  display: inline-flex !important;
+  width: 180px !important;
+  margin: 0 auto !important;
+  padding: 12px 20px !important;
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  border: 2px solid #ef4444 !important;
+  border-radius: 8px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 8px !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35) !important;
+  font-family: inherit !important;
+  transition: all 0.2s ease !important;
 }
 
 .adm-footer-logout-btn:hover {
-  background: #b91c1c;
-  border-color: #b91c1c;
-  box-shadow: 0 6px 18px rgba(185, 28, 28, 0.5);
-  transform: translateY(-2px);
-}
-
-@media (max-width: 768px) {
-  .adm-footer-content {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .adm-footer-help-section {
-    width: 100%;
-    box-sizing: border-box;
-  }
-  .adm-footer-logout-btn {
-    width: 100%;
-  }
+  background: #b91c1c !important;
+  border-color: #b91c1c !important;
+  transform: translateY(-2px) !important;
 }

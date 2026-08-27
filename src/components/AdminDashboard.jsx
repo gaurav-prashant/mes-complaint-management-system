@@ -784,42 +784,21 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      {/* ══ ADMIN DASHBOARD FOOTER ════════════════════════════════════════ */}
-      <footer className="adm-dashboard-footer">
-        <div className="adm-footer-content">
-          <div className="adm-footer-info">
-            <div className="adm-footer-brand">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              </svg>
-              <span>MES Complaint Corner — Admin Panel</span>
-            </div>
-            <p className="adm-footer-sub">
-              Management by Efficiency &amp; Synergy. Authorized Admin Operations &amp; Support Console.
-            </p>
-          </div>
-
-          <div className="adm-footer-help-section">
-            <h4 className="adm-footer-help-title">Need Help &amp; Support?</h4>
-            <p className="adm-footer-help-text">
-              For technical assistance or system issues: <strong>support@mes-system.com</strong>
-            </p>
-            
-            {/* Red Danger Styled Logout Button */}
-            <button
-              type="button"
-              className="adm-footer-logout-btn"
-              onClick={handleLogout}
-              aria-label="Logout"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-              <span>Logout</span>
-            </button>
-          </div>
-        </div>
-      </footer>
+      {/* ══ ADMIN ACCOUNT & LOGOUT SECTION ════════════════════════════════════ */}
+      <section className="adm-account-section">
+        <h3 className="adm-account-heading">Admin Account</h3>
+        <button
+          type="button"
+          className="adm-footer-logout-btn"
+          onClick={handleLogout}
+          aria-label="Logout"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          <span>Logout</span>
+        </button>
+      </section>
 
       {/* ══ COMPLAINT DETAILS MODAL ═══════════════════════════════════════════ */}
       {selectedComplaint && (
