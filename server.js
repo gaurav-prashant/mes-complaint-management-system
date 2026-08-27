@@ -50,13 +50,16 @@ async function connectDB() {
   }
 }
 
+// Request logging middleware for debugging serverless invocations
+app.use((req, res, next) => {
+  console.log(`[API Request] ${req.method} ${req.originalUrl || req.url}`);
+  next();
+});
+
 // URL Path Normalization Middleware for Netlify Functions & local dev compatibility
 app.use((req, res, next) => {
   if (req.url.startsWith('/.netlify/functions/api')) {
     req.url = req.url.replace('/.netlify/functions/api', '') || '/';
-  }
-  if (!req.url.startsWith('/api')) {
-    req.url = '/api' + req.url;
   }
   next();
 });
@@ -75,18 +78,22 @@ app.use(async (req, res, next) => {
   next();
 });
 
-// Admin Login
-app.post('/api/admin/login', (req, res) => {
-  const { email, password } = req.body;
+// Admin Login (supports both /api/admin/login and /admin/login)
+app.post(['/api/admin/login', '/admin/login'], (req, res) => {
+  const { email, password } = req.body || {};
+  console.log(`[Admin Login Attempt] Email: ${email || 'N/A'}`);
+
   if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+    console.log(`[Admin Login Success] Auth successful for: ${email}`);
     res.json({ success: true, token: 'fake-jwt-token-12345' });
   } else {
+    console.log(`[Admin Login Failed] Invalid credentials for: ${email}`);
     res.status(401).json({ success: false, message: 'Invalid email or password' });
   }
 });
 
 // Get all complaints
-app.get('/api/complaints', async (req, res) => {
+app.get(['/api/complaints', '/complaints'], async (req, res) => {
   try {
     if (!complaintsCollection) {
       return res.status(500).json({ success: false, message: 'Unable to connect to MongoDB' });
@@ -101,7 +108,7 @@ app.get('/api/complaints', async (req, res) => {
 });
 
 // Get a specific complaint by ID (for Track Status)
-app.get('/api/complaints/:id', async (req, res) => {
+app.get(['/api/complaints/:id', '/complaints/:id'], async (req, res) => {
   const { id } = req.params;
   try {
     if (!complaintsCollection) {
@@ -128,7 +135,7 @@ app.get('/api/complaints/:id', async (req, res) => {
 });
 
 // Update complaint status
-app.put('/api/complaints/:id/status', async (req, res) => {
+app.put(['/api/complaints/:id/status', '/complaints/:id/status'], async (req, res) => {
   const { id } = req.params;
   const { status, admin_remarks } = req.body;
 
@@ -172,7 +179,7 @@ app.put('/api/complaints/:id/status', async (req, res) => {
 });
 
 // Add a new complaint (for Submit Complaint page)
-app.post('/api/complaints', async (req, res) => {
+app.post(['/api/complaints', '/complaints'], async (req, res) => {
   try {
     if (!complaintsCollection) {
       return res.status(500).json({ success: false, message: 'Unable to connect to MongoDB' });
