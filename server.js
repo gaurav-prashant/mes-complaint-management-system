@@ -201,6 +201,41 @@ app.post(['/api/complaints', '/complaints'], async (req, res) => {
   }
 });
 
+// Delete a complaint (Super Admin operation)
+app.delete(['/api/complaints/:id', '/complaints/:id'], async (req, res) => {
+  const { id } = req.params;
+  console.log(`[API Request] DELETE complaint ID: ${id}`);
+  try {
+    if (!complaintsCollection) {
+      return res.status(500).json({ success: false, message: 'Unable to connect to MongoDB' });
+    }
+
+    let filter = {};
+    if (ObjectId.isValid(id) && String(new ObjectId(id)) === id) {
+      filter = { _id: new ObjectId(id) };
+    } else {
+      filter = { _id: id };
+    }
+
+    let result = await complaintsCollection.deleteOne(filter);
+
+    if (result.deletedCount === 0) {
+      // Fallback try by complaintId string field
+      result = await complaintsCollection.deleteOne({ complaintId: id });
+    }
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ success: false, message: 'Complaint not found' });
+    }
+
+    console.log(`[API Delete Success] Deleted complaint ID: ${id}`);
+    res.json({ success: true, message: 'Complaint deleted successfully', id });
+  } catch (error) {
+    console.error('Error deleting complaint:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete complaint' });
+  }
+});
+
 // Fallback 404 handler (returns JSON instead of HTML for unmatched API routes)
 app.use((req, res) => {
   console.log(`[API 404 Fallback] Unmatched route: ${req.method} ${req.originalUrl || req.url}`);
