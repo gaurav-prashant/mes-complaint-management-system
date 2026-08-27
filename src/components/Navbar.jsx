@@ -38,7 +38,7 @@ export default function Navbar() {
         <NavLink to="/submit-complaint" onClick={closeMenu} className={({ isActive }) => `nav-link ${isActive ? 'nav-active' : ''}`}>Submit Complaint</NavLink>
         <NavLink to="/track-status" onClick={closeMenu} className={({ isActive }) => `nav-link ${isActive ? 'nav-active' : ''}`}>Track Status</NavLink>
         <NavLink to="/about" onClick={closeMenu} className={({ isActive }) => `nav-link ${isActive ? 'nav-active' : ''}`}>About Us</NavLink>
-        <NavLink to="/admin" onClick={closeMenu} className={({ isActive }) => `nav-link admin-button ${isActive ? 'nav-active' : ''}`}>Admin</NavLink>
+        <NavLink to="/admin/login" onClick={closeMenu} className={({ isActive }) => `nav-link admin-button ${isActive ? 'nav-active' : ''}`}>Admin</NavLink>
         <NavLink to="/super-admin/login" onClick={closeMenu} className={({ isActive }) => `nav-link ${isActive ? 'nav-active' : ''}`}>Super Admin</NavLink>
       </div>
     </div>
