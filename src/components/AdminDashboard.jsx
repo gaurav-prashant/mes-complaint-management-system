@@ -198,8 +198,11 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    const isAuthenticated = localStorage.getItem('adminAuthenticated');
-    if (!isAuthenticated) { navigate('/admin'); return; }
+    const isAuthenticated = localStorage.getItem('adminAuthenticated') === 'true';
+    if (!isAuthenticated) {
+      navigate('/admin/login', { replace: true });
+      return;
+    }
     fetchComplaints();
   }, [navigate]);
 
@@ -207,7 +210,10 @@ export default function AdminDashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem('adminAuthenticated');
-    navigate('/admin');
+    localStorage.removeItem('adminToken');
+    sessionStorage.removeItem('adminAuthenticated');
+    sessionStorage.removeItem('adminToken');
+    navigate('/admin/login', { replace: true });
   };
 
   // ── Modal ────────────────────────────────────────────────────────────────────

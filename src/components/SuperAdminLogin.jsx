@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function SuperAdminLogin() {
@@ -11,6 +11,13 @@ export default function SuperAdminLogin() {
   const [loginError, setLoginError] = useState('');
   
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const isAuth = localStorage.getItem('superAdminAuthenticated') === 'true';
+    if (isAuth) {
+      navigate('/super-admin/dashboard', { replace: true });
+    }
+  }, [navigate]);
 
   const validate = () => {
     let isValid = true;
@@ -45,12 +52,14 @@ export default function SuperAdminLogin() {
     
     setIsLoading(true);
 
-    // Mock authentication
+    // Authentication check
     setTimeout(() => {
       setIsLoading(false);
       
       if (email === 'superadmin@example.com' && password === 'superadmin123') {
-        navigate('/super-admin/dashboard');
+        localStorage.setItem('superAdminAuthenticated', 'true');
+        localStorage.setItem('superAdminToken', 'super-admin-token-12345');
+        navigate('/super-admin/dashboard', { replace: true });
       } else {
         setLoginError('Invalid email or password.');
       }

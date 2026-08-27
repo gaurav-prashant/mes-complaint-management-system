@@ -178,13 +178,22 @@ export default function SuperAdminDashboard() {
   };
 
   useEffect(() => {
+    const isAuth = localStorage.getItem('superAdminAuthenticated') === 'true';
+    if (!isAuth) {
+      navigate('/super-admin/login', { replace: true });
+      return;
+    }
     fetchComplaints();
-  }, []);
+  }, [navigate]);
 
   // ── Logout ───────────────────────────────────────────────────────────────────
 
   const handleLogout = () => {
-    navigate('/super-admin/login');
+    localStorage.removeItem('superAdminAuthenticated');
+    localStorage.removeItem('superAdminToken');
+    sessionStorage.removeItem('superAdminAuthenticated');
+    sessionStorage.removeItem('superAdminToken');
+    navigate('/super-admin/login', { replace: true });
   };
 
   // ── Modal Handlers ───────────────────────────────────────────────────────────

@@ -38,6 +38,7 @@ function App() {
             <Route path="/track-status" element={<TrackComplaint />} />
             <Route path="/about" element={<About />} />
             <Route path="/admin" element={<AdminLogin />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/super-admin/login" element={<SuperAdminLogin />} />
             <Route path="/super-admin/dashboard" element={<SuperAdminDashboard />} />
