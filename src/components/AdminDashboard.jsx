@@ -198,8 +198,10 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
+    console.log('[Route Render] AdminDashboard component mounted. Checking auth...');
     const isAuthenticated = localStorage.getItem('adminAuthenticated') === 'true';
     if (!isAuthenticated) {
+      console.log('[Auth Guard] adminAuthenticated is NOT true -> redirecting to /admin/login');
       navigate('/admin/login', { replace: true });
       return;
     }

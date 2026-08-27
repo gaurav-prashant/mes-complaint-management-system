@@ -13,8 +13,10 @@ export default function AdminLogin() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    console.log('[Route Render] AdminLogin component mounted. Checking auth...');
     const isAuth = localStorage.getItem('adminAuthenticated') === 'true';
     if (isAuth) {
+      console.log('[Auth Guard] adminAuthenticated is true -> redirecting to /admin/dashboard');
       navigate('/admin/dashboard', { replace: true });
     }
   }, [navigate]);

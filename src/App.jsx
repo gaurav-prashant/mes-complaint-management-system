@@ -40,6 +40,7 @@ function App() {
             <Route path="/admin" element={<AdminLogin />} />
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/super-admin" element={<SuperAdminLogin />} />
             <Route path="/super-admin/login" element={<SuperAdminLogin />} />
             <Route path="/super-admin/dashboard" element={<SuperAdminDashboard />} />
           </Routes>
