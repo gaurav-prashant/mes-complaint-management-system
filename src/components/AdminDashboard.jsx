@@ -181,7 +181,7 @@ export default function AdminDashboard() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000/api' : '/api');
       const response = await fetch(`${API_BASE}/complaints`, { signal: controller.signal });
       clearTimeout(timeoutId);
       let data;
@@ -224,7 +224,7 @@ export default function AdminDashboard() {
     if (!selectedComplaint) return;
     const targetId = selectedComplaint._id || selectedComplaint.complaintId;
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000/api' : '/api');
       const response = await fetch(`${API_BASE}/complaints/${targetId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

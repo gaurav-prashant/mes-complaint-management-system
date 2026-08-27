@@ -16,13 +16,15 @@ const MONGO_URI = process.env.MONGO_URI;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@mes.com';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
+let client;
 let db;
 let complaintsCollection;
 
 async function connectDB() {
+  if (complaintsCollection) return complaintsCollection;
   if (!MONGO_URI) {
     console.error('MONGO_URI is missing in .env');
-    return;
+    return null;
   }
   try {
     let finalUri = MONGO_URI;
@@ -34,17 +36,28 @@ async function connectDB() {
       finalUri = `mongodb://${authPart}@ac-bqi0hjs-shard-00-00.y85m2k4.mongodb.net:27017,ac-bqi0hjs-shard-00-01.y85m2k4.mongodb.net:27017,ac-bqi0hjs-shard-00-02.y85m2k4.mongodb.net:27017/?ssl=true&replicaSet=atlas-28odxw-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Cluster0`;
     }
 
-    const client = new MongoClient(finalUri);
-    await client.connect();
+    if (!client) {
+      client = new MongoClient(finalUri);
+      await client.connect();
+    }
     db = client.db('mes_complaint_db');
     complaintsCollection = db.collection('complaints');
     console.log('MongoDB connected successfully');
+    return complaintsCollection;
   } catch (err) {
     console.error('MongoDB connection error:', err);
+    return null;
   }
 }
 
+// Connect eagerly for local dev and attach middleware for serverless invocations
 connectDB();
+app.use(async (req, res, next) => {
+  if (!complaintsCollection) {
+    await connectDB();
+  }
+  next();
+});
 
 // Admin Login
 app.post('/api/admin/login', (req, res) => {
@@ -161,6 +174,10 @@ app.post('/api/complaints', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://127.0.0.1:${PORT}`);
-});
+if (process.env.NETLIFY !== 'true' && !process.env.LAMBDA_TASK_ROOT) {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://127.0.0.1:${PORT}`);
+  });
+}
+
+export default app;
