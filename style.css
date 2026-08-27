@@ -86,7 +86,7 @@ body,
 section.main,
 .main .block-container,
 .block-container {
-    max-width: 100vw !important;
+    max-width: 100% !important;
     width: 100% !important;
     padding: 0 !important;
     margin: 0 !important;
@@ -924,7 +924,7 @@ a[href*="page=about"]::after {
 .features {
     width: 86%;
 
-    margin: 0 auto 55px auto;
+    margin: 0 auto 30px auto;
 
     display: grid;
 
@@ -1003,14 +1003,9 @@ a[href*="page=about"]::after {
    ========================================================= */
 
 .cta {
-    width: 100vw !important;
-    position: relative !important;
-    left: 50% !important;
-    right: 50% !important;
-    margin-left: -50vw !important;
-    margin-right: -50vw !important;
-    margin-top: 40px !important;
-    margin-bottom: 0 !important;
+    width: 100% !important;
+    position: static !important;
+    margin: 0 !important;
     padding: 48px 20px !important;
     background: linear-gradient(90deg, #8b1818 0%, #68291b 35%, #30542c 70%, #16632f 100%) !important;
     text-align: center !important;
@@ -1040,27 +1035,47 @@ a[href*="page=about"]::after {
 .cta-btn,
 .cta .primary-btn {
     display: inline-flex !important;
+
     align-items: center !important;
+
     justify-content: center !important;
+
     gap: 8px !important;
-    background: #ffffff !important;
-    color: #8b1818 !important;
-    font-size: 14.5px !important;
+
+    background: #2563eb !important;
+
+    color: #ffffff !important;
+
+    font-size: 15px !important;
+
     font-weight: 700 !important;
-    padding: 12px 28px !important;
-    border-radius: 9px !important;
+
+    padding: 13px 28px !important;
+
+    border-radius: 10px !important;
+
     text-decoration: none !important;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35) !important;
+
     transition: all 0.25s ease !important;
+
     border: none !important;
+
+    opacity: 1 !important;
+
+    visibility: visible !important;
 }
 
 .cta-btn:hover,
 .cta .primary-btn:hover {
-    background: #ffffff !important;
-    color: #711414 !important;
-    transform: translateY(-2px) scale(1.02) !important;
-    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3) !important;
+    background: #1d4ed8 !important;
+
+    color: #ffffff !important;
+
+    transform: translateY(-2px) !important;
+
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.45) !important;
 }
 
 
@@ -1071,28 +1086,55 @@ a[href*="page=about"]::after {
    FOOTER (Custom Footer & Track Footer Unified Styles)
    ========================================================= */
 
-.custom-footer,
-.track-footer {
+.footer-wrapper {
     width: 100% !important;
+
+    max-width: 100% !important;
+
+    position: relative !important;
+
+    left: auto !important;
+
+    right: auto !important;
+
+    margin: 0 !important;
+
+    padding: 0 !important;
+
+    border: none !important;
+
     background: #0b1224 !important;
-    color: #ffffff !important;
-    padding: 44px 8% 28px 8% !important;
-    border-radius: 0 !important;
-    margin-top: 0 !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+
+    display: flex !important;
+
+    flex-direction: column !important;
+
+    gap: 0 !important;
+
     box-sizing: border-box !important;
 }
 
-/* Scoped zero gap between CTA container and Footer container */
-div[data-testid="element-container"]:has(.cta) {
-    margin-bottom: 0 !important;
-    padding-bottom: 0 !important;
-}
+.custom-footer,
+.track-footer {
+    width: 100% !important;
 
-div[data-testid="element-container"]:has(.track-footer),
-div[data-testid="element-container"]:has(.custom-footer) {
-    margin-top: 0 !important;
-    padding-top: 0 !important;
+    position: static !important;
+
+    margin: 0 !important;
+
+    padding: 28px 8% 16px 8% !important;
+
+    background: #0b1224 !important;
+
+    color: #ffffff !important;
+
+    border-radius: 0 !important;
+
+    border-top: none !important;
+
+    box-sizing: border-box !important;
+
+    display: block !important;
 }
 
 
@@ -1590,8 +1632,7 @@ div[data-testid="element-container"]:has(.custom-footer) {
 
 
     .stats-container,
-    .features,
-    .cta {
+    .features {
         width: 90%;
     }
 
@@ -1842,31 +1883,45 @@ div[data-testid="element-container"]:has(.custom-footer) {
 
     /* CTA Mobile */
     .cta {
-        width: 100vw !important;
-        margin-left: -50vw !important;
-        margin-right: -50vw !important;
-        left: 50% !important;
-        right: 50% !important;
-        padding: 36px 20px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        left: auto !important;
+        right: auto !important;
+        position: static !important;
+        padding: 54px 18px !important;
         margin-bottom: 0 !important;
         border-radius: 0 !important;
         text-align: center !important;
+        box-sizing: border-box !important;
     }
 
     .cta h2 {
-        font-size: 24px !important;
+        font-size: 25px !important;
+        margin-bottom: 12px !important;
     }
 
     .cta p {
-        font-size: 14px !important;
+        font-size: 14.5px !important;
+        line-height: 1.6 !important;
+        margin-bottom: 26px !important;
     }
 
     /* Footer Mobile */
     .custom-footer,
     .track-footer {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        left: auto !important;
+        right: auto !important;
+        position: static !important;
         padding: 36px 6% 24px 6% !important;
         border-radius: 0 !important;
         margin-top: 0 !important;
+        box-sizing: border-box !important;
     }
 
     .footer-grid {
@@ -2523,10 +2578,10 @@ body,
     background: #090f1e !important;
     color: #ffffff !important;
     padding: 36px 8% 40px !important;
-    margin-top: 50px !important;
+    margin-top: 0 !important;
     margin-bottom: 0 !important;
     font-family: 'Inter', sans-serif !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-top: none !important;
 }
 
 .track-footer-grid {
@@ -3644,4 +3699,273 @@ div[data-testid="stForm"]:has(input[aria-label="Super Admin Security Key"]) [dat
     background: linear-gradient(90deg, #1d4ed8 0%, #4338ca 100%) !important;
     box-shadow: 0 12px 28px rgba(37, 99, 235, 0.40) !important;
     transform: translateY(-2px) !important;
+}
+
+/* =========================================================
+   RESPONSIVE DESIGN (MOBILE & TABLET BREAKPOINTS)
+   ========================================================= */
+
+/* Global Mobile Overflow Reset */
+html, body, #root, .app-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+/* Tablet Screens (<= 992px) */
+@media screen and (max-width: 992px) {
+    .stats-container {
+        width: 92% !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 16px !important;
+        margin: 30px auto 35px auto !important;
+    }
+
+    .features {
+        width: 92% !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 16px !important;
+        margin: 0 auto 24px auto !important;
+    }
+
+    .hero-content h1 {
+        font-size: 34px !important;
+    }
+}
+
+/* Mobile Screens (<= 768px) */
+@media screen and (max-width: 768px) {
+
+    /* Navbar Mobile & Hamburger Menu Toggle */
+    .navbar {
+        padding: 12px 18px !important;
+        flex-wrap: wrap !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+    }
+
+    .mobile-menu-btn {
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        align-items: center !important;
+        gap: 5px !important;
+        width: 40px !important;
+        height: 40px !important;
+        border-radius: 8px !important;
+        background: rgba(255, 255, 255, 0.12) !important;
+        cursor: pointer !important;
+    }
+
+    .hamburger-line {
+        width: 22px !important;
+        height: 2px !important;
+        background: #ffffff !important;
+        border-radius: 4px !important;
+        display: block !important;
+    }
+
+    .nav-links {
+        display: none !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        background: #06152b !important;
+        padding: 14px !important;
+        border-radius: 12px !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        margin-top: 10px !important;
+        gap: 6px !important;
+    }
+
+    .menu-toggle-checkbox:checked ~ .nav-links {
+        display: flex !important;
+    }
+
+    .nav-links .nav-link,
+    .nav-links a {
+        width: 100% !important;
+        justify-content: flex-start !important;
+        padding: 10px 16px !important;
+        font-size: 14.5px !important;
+        border-radius: 8px !important;
+    }
+
+    .logo-box img {
+        width: 50px !important;
+        height: 50px !important;
+        border-radius: 10px !important;
+    }
+
+    .logo-title {
+        font-size: 15px !important;
+    }
+
+    .logo-subtitle {
+        font-size: 11px !important;
+    }
+
+    /* Hero Mobile Styles */
+    .hero {
+        padding: 40px 16px 60px 16px !important;
+    }
+
+    .hero-content {
+        max-width: 100% !important;
+    }
+
+    .hero-content h1 {
+        font-size: 28px !important;
+        line-height: 1.3 !important;
+    }
+
+    .hero-content p {
+        font-size: 15px !important;
+        line-height: 1.5 !important;
+    }
+
+    .hero-badge {
+        font-size: 12px !important;
+        padding: 5px 12px !important;
+    }
+
+    .hero-buttons {
+        flex-direction: column !important;
+        width: 100% !important;
+        gap: 12px !important;
+    }
+
+    .primary-btn,
+    .secondary-btn {
+        width: 100% !important;
+        justify-content: center !important;
+        padding: 14px 20px !important;
+        font-size: 15px !important;
+        box-sizing: border-box !important;
+    }
+
+    .developer-credit {
+        font-size: 13px !important;
+    }
+
+    /* Statistics Mobile Styles */
+    .stats-container {
+        width: 92% !important;
+        grid-template-columns: 1fr !important;
+        gap: 14px !important;
+        margin: 25px auto 30px auto !important;
+    }
+
+    .stat-card {
+        padding: 18px 16px !important;
+        gap: 14px !important;
+        min-height: auto !important;
+    }
+
+    .stat-icon {
+        width: 60px !important;
+        height: 60px !important;
+        min-width: 60px !important;
+        border-radius: 12px !important;
+    }
+
+    .stat-symbol {
+        font-size: 30px !important;
+    }
+
+    .stat-value {
+        font-size: 24px !important;
+    }
+
+    /* Features Section Mobile Styles */
+    .section-title {
+        font-size: 24px !important;
+        padding: 0 10px !important;
+    }
+
+    .features-wrapper {
+        margin-top: 25px !important;
+    }
+
+    .features {
+        width: 92% !important;
+        grid-template-columns: 1fr !important;
+        gap: 14px !important;
+        margin: 0 auto 20px auto !important;
+    }
+
+    .feature-card {
+        padding: 22px 16px !important;
+        min-height: auto !important;
+    }
+
+    .feature-icon {
+        width: 55px !important;
+        height: 55px !important;
+        font-size: 24px !important;
+        margin-bottom: 12px !important;
+    }
+
+    /* CTA Section Mobile Styles */
+    .cta {
+        padding: 54px 18px !important;
+    }
+
+    .cta h2 {
+        font-size: 25px !important;
+        margin-bottom: 12px !important;
+    }
+
+    .cta p {
+        font-size: 14.5px !important;
+        line-height: 1.6 !important;
+        margin-bottom: 26px !important;
+        padding: 0 10px !important;
+    }
+
+    .cta-btn {
+        width: 100% !important;
+        max-width: 320px !important;
+        box-sizing: border-box !important;
+        padding: 14px 20px !important;
+        font-size: 15px !important;
+    }
+
+    /* Footer Mobile Styles */
+    .track-footer {
+        padding: 30px 6% 24px 6% !important;
+    }
+
+    /* Scoped Horizontal Scrolling for Mobile Data Tables */
+    .table-container,
+    .admin-table-container,
+    div[data-testid="stTable"],
+    div[data-testid="stDataFrame"] {
+        width: 100% !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+}
+
+/* Extra Small Devices (<= 480px / 390px / 375px / 320px) */
+@media screen and (max-width: 480px) {
+    .logo-title {
+        font-size: 13.5px !important;
+    }
+
+    .logo-subtitle {
+        font-size: 10px !important;
+    }
+
+    .hero-content h1 {
+        font-size: 24px !important;
+    }
+
+    .stat-value {
+        font-size: 22px !important;
+    }
 }
