@@ -10,16 +10,6 @@ export default function Navbar() {
     if (checkbox) checkbox.checked = false;
   };
 
-  const handleAdminNav = () => {
-    console.log('[NAV DEBUG] Admin link clicked -> Target: /admin/login');
-    closeMenu();
-  };
-
-  const handleSuperAdminNav = () => {
-    console.log('[NAV DEBUG] Super Admin link clicked -> Target: /super-admin/login');
-    closeMenu();
-  };
-
   return (
     <div className="navbar">
       <div className="logo-section" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
@@ -48,8 +38,8 @@ export default function Navbar() {
         <NavLink to="/submit-complaint" onClick={closeMenu} className={({ isActive }) => `nav-link ${isActive ? 'nav-active' : ''}`}>Submit Complaint</NavLink>
         <NavLink to="/track-status" onClick={closeMenu} className={({ isActive }) => `nav-link ${isActive ? 'nav-active' : ''}`}>Track Status</NavLink>
         <NavLink to="/about" onClick={closeMenu} className={({ isActive }) => `nav-link ${isActive ? 'nav-active' : ''}`}>About Us</NavLink>
-        <NavLink to="/admin/login" onClick={handleAdminNav} className={({ isActive }) => `nav-link admin-button ${isActive ? 'nav-active' : ''}`}>Admin</NavLink>
-        <NavLink to="/super-admin/login" onClick={handleSuperAdminNav} className={({ isActive }) => `nav-link ${isActive ? 'nav-active' : ''}`}>Super Admin</NavLink>
+        <NavLink to="/admin/login" onClick={closeMenu} className={({ isActive }) => `nav-link admin-button ${isActive ? 'nav-active' : ''}`}>Admin</NavLink>
+        <NavLink to="/super-admin/login" onClick={closeMenu} className={({ isActive }) => `nav-link ${isActive ? 'nav-active' : ''}`}>Super Admin</NavLink>
       </div>
     </div>
   )

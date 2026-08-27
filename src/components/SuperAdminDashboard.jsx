@@ -178,10 +178,8 @@ export default function SuperAdminDashboard() {
   };
 
   useEffect(() => {
-    console.log('[Route Render] SuperAdminDashboard component mounted. Checking auth...');
     const isAuth = localStorage.getItem('superAdminAuthenticated') === 'true';
     if (!isAuth) {
-      console.log('[Auth Guard] superAdminAuthenticated is NOT true -> redirecting to /super-admin/login');
       navigate('/super-admin/login', { replace: true });
       return;
     }

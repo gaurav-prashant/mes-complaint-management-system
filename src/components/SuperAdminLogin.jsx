@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function SuperAdminLogin() {
@@ -11,15 +11,6 @@ export default function SuperAdminLogin() {
   const [loginError, setLoginError] = useState('');
   
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    console.log('[Route Render] SuperAdminLogin component mounted. Checking auth...');
-    const isAuth = localStorage.getItem('superAdminAuthenticated') === 'true';
-    if (isAuth) {
-      console.log('[Auth Guard] superAdminAuthenticated is true -> redirecting to /super-admin/dashboard');
-      navigate('/super-admin/dashboard', { replace: true });
-    }
-  }, [navigate]);
 
   const validate = () => {
     let isValid = true;

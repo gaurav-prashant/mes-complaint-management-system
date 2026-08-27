@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function AdminLogin() {
@@ -11,15 +11,6 @@ export default function AdminLogin() {
   const [loginError, setLoginError] = useState('');
   
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    console.log('[Route Render] AdminLogin component mounted. Checking auth...');
-    const isAuth = localStorage.getItem('adminAuthenticated') === 'true';
-    if (isAuth) {
-      console.log('[Auth Guard] adminAuthenticated is true -> redirecting to /admin/dashboard');
-      navigate('/admin/dashboard', { replace: true });
-    }
-  }, [navigate]);
 
   const validate = () => {
     let isValid = true;
