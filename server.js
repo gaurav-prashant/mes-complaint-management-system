@@ -7,15 +7,8 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { Resend } from 'resend';
 import os from 'os';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
 
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const distPath = path.join(__dirname, 'dist');
 
 const app = express();
 app.use(cors());
@@ -1257,20 +1250,6 @@ app.delete(['/api/complaints/:id', '/complaints/:id'], authenticateSuperAdmin, a
     res.status(500).json({ success: false, message: 'Failed to delete complaint' });
   }
 });
-
-// ─── Static Production Assets & SPA Fallback ───────────────────────────────────
-
-if (fs.existsSync(distPath)) {
-  app.use(express.static(distPath));
-
-  // Express 5 compatible SPA fallback middleware
-  app.use((req, res, next) => {
-    if (req.method !== 'GET' || req.path.startsWith('/api') || req.url.startsWith('/api')) {
-      return next();
-    }
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
-}
 
 // ─── Fallback 404 ─────────────────────────────────────────────────────────────
 
