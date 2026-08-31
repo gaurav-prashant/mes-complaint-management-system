@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import getApiBase from '../utils/apiBase';
 import {
   PieChart,
   Pie,
@@ -153,6 +154,26 @@ export default function SuperAdminDashboard() {
   const [deleteTarget, setDeleteTarget]           = useState(null);
   const [isDeleting, setIsDeleting]               = useState(false);
 
+  // ── Account Settings state ───────────────────────────────────────────────────
+  const [saEmail, setSaEmail]             = useState('');
+  const [acctModalOpen, setAcctModalOpen] = useState(false);
+  const [acctView, setAcctView]         = useState('main'); // 'main' | 'email' | 'password'
+
+  // Change Email form state
+  const [ceNewEmail, setCeNewEmail]     = useState('');
+  const [ceCurrentPwd, setCeCurrentPwd] = useState('');
+  const [ceError, setCeError]           = useState('');
+  const [ceSuccess, setCeSuccess]       = useState('');
+  const [ceLoading, setCeLoading]       = useState(false);
+
+  // Change Password form state
+  const [cpCurrentPwd, setCpCurrentPwd] = useState('');
+  const [cpNewPwd, setCpNewPwd]         = useState('');
+  const [cpConfirmPwd, setCpConfirmPwd] = useState('');
+  const [cpError, setCpError]           = useState('');
+  const [cpSuccess, setCpSuccess]       = useState('');
+  const [cpLoading, setCpLoading]       = useState(false);
+
   // ── Fetch Complaints ──────────────────────────────────────────────────────────
 
   const fetchComplaints = async () => {
@@ -161,9 +182,20 @@ export default function SuperAdminDashboard() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000/api' : '/api');
-      const response = await fetch(`${API_BASE}/complaints`, { signal: controller.signal });
+      const API_BASE = getApiBase();
+      const token = localStorage.getItem('superAdminToken');
+      const response = await fetch(`${API_BASE}/complaints`, {
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+      });
       clearTimeout(timeoutId);
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
       let data;
       try { data = await response.json(); } catch { throw new Error('Invalid JSON response from server'); }
       if (!response.ok || !data.success) throw new Error(data?.message || 'Failed to fetch complaints');
@@ -177,14 +209,55 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  // ── Auth Guard & Profile Fetch ──────────────────────────────────────────────
+
   useEffect(() => {
-    const isAuth = localStorage.getItem('superAdminAuthenticated') === 'true';
-    if (!isAuth) {
-      navigate('/super-admin/login', { replace: true });
+    const token = localStorage.getItem('superAdminToken');
+    if (!token) {
+      handleLogout();
       return;
     }
+
+    try {
+      const payloadBase64 = token.split('.')[1];
+      if (payloadBase64) {
+        const payload = JSON.parse(atob(payloadBase64));
+        if (payload.exp && Date.now() / 1000 > payload.exp) {
+          handleLogout();
+          return;
+        }
+      }
+    } catch {
+      handleLogout();
+      return;
+    }
+
     fetchComplaints();
+    fetchSuperAdminProfile();
   }, [navigate]);
+
+  // ── Fetch SuperAdmin Profile ─────────────────────────────────────────────────
+
+  const fetchSuperAdminProfile = async () => {
+    try {
+      const API_BASE = getApiBase();
+      const token = localStorage.getItem('superAdminToken');
+      if (!token) return;
+      const response = await fetch(`${API_BASE}/super-admin/profile`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
+      const data = await response.json();
+      if (data.success && data.superadmin) {
+        setSaEmail(data.superadmin.email);
+      }
+    } catch (err) {
+      console.error('[SuperAdmin Profile]', err.message);
+    }
+  };
 
   // ── Logout ───────────────────────────────────────────────────────────────────
 
@@ -194,6 +267,128 @@ export default function SuperAdminDashboard() {
     sessionStorage.removeItem('superAdminAuthenticated');
     sessionStorage.removeItem('superAdminToken');
     navigate('/super-admin/login', { replace: true });
+  };
+
+  // ── Change Email ──────────────────────────────────────────────────────────────
+
+  const handleChangeEmail = async (e) => {
+    e.preventDefault();
+    setCeError('');
+    setCeSuccess('');
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!ceNewEmail || !emailRegex.test(ceNewEmail)) {
+      setCeError('Please enter a valid new email address');
+      return;
+    }
+    if (!ceCurrentPwd) {
+      setCeError('Current password is required');
+      return;
+    }
+
+    setCeLoading(true);
+    try {
+      const API_BASE = getApiBase();
+      const token = localStorage.getItem('superAdminToken');
+      const response = await fetch(`${API_BASE}/super-admin/change-email`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ newEmail: ceNewEmail, currentPassword: ceCurrentPwd }),
+      });
+      const data = await response.json();
+
+      if (response.status === 401 && !data.success && data.message === 'Current password is incorrect') {
+        setCeError('Current password is incorrect');
+        return;
+      }
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
+      if (response.status === 409) {
+        setCeError(data.message || 'Email is already in use');
+        return;
+      }
+      if (!data.success) {
+        setCeError(data.message || 'Failed to update email');
+        return;
+      }
+
+      setCeSuccess('Email updated successfully! Redirecting to login…');
+      setCeNewEmail('');
+      setCeCurrentPwd('');
+      localStorage.removeItem('superAdminToken');
+      localStorage.removeItem('superAdminAuthenticated');
+      sessionStorage.removeItem('superAdminToken');
+      sessionStorage.removeItem('superAdminAuthenticated');
+      setTimeout(() => {
+        navigate('/super-admin/login', { replace: true });
+      }, 1500);
+    } catch (err) {
+      setCeError('Failed to update email. Please try again.');
+    } finally {
+      setCeLoading(false);
+    }
+  };
+
+  // ── Change Password ───────────────────────────────────────────────────────────
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setCpError('');
+    setCpSuccess('');
+
+    if (!cpCurrentPwd) { setCpError('Current password is required'); return; }
+    if (!cpNewPwd)      { setCpError('New password is required'); return; }
+    if (cpNewPwd.length < 8) { setCpError('New password must be at least 8 characters'); return; }
+    if (cpNewPwd !== cpConfirmPwd) { setCpError('Passwords do not match'); return; }
+
+    setCpLoading(true);
+    try {
+      const API_BASE = getApiBase();
+      const token = localStorage.getItem('superAdminToken');
+      const response = await fetch(`${API_BASE}/super-admin/change-password`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ currentPassword: cpCurrentPwd, newPassword: cpNewPwd }),
+      });
+      const data = await response.json();
+
+      if (response.status === 401 && data.message === 'Current password is incorrect') {
+        setCpError('Current password is incorrect');
+        return;
+      }
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
+      if (!data.success) {
+        setCpError(data.message || 'Failed to change password');
+        return;
+      }
+
+      setCpSuccess('Password changed successfully! Redirecting to login…');
+      setCpCurrentPwd('');
+      setCpNewPwd('');
+      setCpConfirmPwd('');
+      localStorage.removeItem('superAdminToken');
+      localStorage.removeItem('superAdminAuthenticated');
+      sessionStorage.removeItem('superAdminToken');
+      sessionStorage.removeItem('superAdminAuthenticated');
+      setTimeout(() => {
+        navigate('/super-admin/login', { replace: true });
+      }, 1500);
+    } catch (err) {
+      setCpError('Failed to change password. Please try again.');
+    } finally {
+      setCpLoading(false);
+    }
   };
 
   // ── Modal Handlers ───────────────────────────────────────────────────────────
@@ -210,12 +405,20 @@ export default function SuperAdminDashboard() {
     if (!selectedComplaint) return;
     const targetId = selectedComplaint._id || selectedComplaint.complaintId;
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000/api' : '/api');
+      const API_BASE = getApiBase();
+      const token = localStorage.getItem('superAdminToken');
       const response = await fetch(`${API_BASE}/complaints/${targetId}/status`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({ status: editStatus, admin_remarks: editRemarks }),
       });
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
       let resData;
       try { resData = await response.json(); } catch { throw new Error('Failed to parse update response'); }
       if (!response.ok || !resData.success) throw new Error(resData?.message || 'Update failed');
@@ -246,10 +449,19 @@ export default function SuperAdminDashboard() {
     const targetId = deleteTarget._id || deleteTarget.complaintId;
     setIsDeleting(true);
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000/api' : '/api');
+      const API_BASE = getApiBase();
+      const token = localStorage.getItem('superAdminToken');
       const response = await fetch(`${API_BASE}/complaints/${targetId}`, {
         method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
       });
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
       let resData;
       try { resData = await response.json(); } catch { throw new Error('Failed to parse delete response'); }
       if (!response.ok || !resData.success) throw new Error(resData?.message || 'Deletion failed');
@@ -414,6 +626,14 @@ export default function SuperAdminDashboard() {
             <span className={`sadm-sys-dot ${sysStatus === 'online' ? 'pulse' : ''}`} />
             {sysStatus === 'online' ? 'MongoDB Atlas Online' : sysStatus === 'connecting' ? 'Connecting API...' : 'System Error'}
           </div>
+
+          <button className="sadm-logout-btn" onClick={() => { setAcctModalOpen(true); setAcctView('main'); }} style={{ marginRight: '8px', background: '#3b82f6', borderColor: '#2563eb' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            Account Settings
+          </button>
 
           <button className="sadm-logout-btn" onClick={handleLogout}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -797,7 +1017,7 @@ export default function SuperAdminDashboard() {
                   <div className="sadm-admin-info">
                     <div className="sadm-admin-role-tag role-super">Super Admin</div>
                     <h4 className="sadm-admin-name">Super Administrator</h4>
-                    <p className="sadm-admin-email">superadmin@example.com</p>
+                    <p className="sadm-admin-email">{saEmail || 'superadmin@example.com'}</p>
                     <div className="sadm-admin-meta-list">
                       <span>✓ Full System Access</span>
                       <span>✓ Complaint Delete Privilege</span>
@@ -1005,6 +1225,187 @@ export default function SuperAdminDashboard() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ ACCOUNT SETTINGS MODAL ═══════════════════════════════════════════ */}
+      {acctModalOpen && (
+        <div
+          className="acct-modal-overlay"
+          onClick={e => e.target === e.currentTarget && setAcctModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="SuperAdmin Account Settings"
+        >
+          <div className="acct-modal">
+
+            {/* Modal Header */}
+            <div className="acct-modal-header">
+              <div className="acct-modal-title-group">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+                <h2 className="acct-modal-h2">SuperAdmin Account Settings</h2>
+              </div>
+              <button className="adm-modal-close-btn" onClick={() => setAcctModalOpen(false)} aria-label="Close">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Current Email display */}
+            <div className="acct-modal-email-row">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" />
+              </svg>
+              <span className="acct-modal-email-label">Signed in as</span>
+              <span className="acct-modal-email-value">{saEmail || '—'}</span>
+            </div>
+
+            {/* Main Tab View */}
+            {acctView === 'main' && (
+              <div className="acct-modal-tabs">
+                <button
+                  className="acct-modal-tab-btn"
+                  onClick={() => { setAcctView('email'); setCeError(''); setCeSuccess(''); setCeNewEmail(''); setCeCurrentPwd(''); }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" />
+                  </svg>
+                  <div>
+                    <span className="acct-tab-title">Change Email Address</span>
+                    <span className="acct-tab-desc">Update your SuperAdmin login email</span>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+
+                <button
+                  className="acct-modal-tab-btn"
+                  onClick={() => { setAcctView('password'); setCpError(''); setCpSuccess(''); setCpCurrentPwd(''); setCpNewPwd(''); setCpConfirmPwd(''); }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  <div>
+                    <span className="acct-tab-title">Change Password</span>
+                    <span className="acct-tab-desc">Update your SuperAdmin password</span>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+              </div>
+            )}
+
+            {/* Change Email Form */}
+            {acctView === 'email' && (
+              <div className="acct-modal-form-area">
+                <button className="acct-modal-back" onClick={() => setAcctView('main')}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                  Back
+                </button>
+                <h3 className="acct-modal-form-h3">Change SuperAdmin Email</h3>
+                {ceSuccess && <div className="acct-success">{ceSuccess}</div>}
+                {ceError   && <div className="acct-error">{ceError}</div>}
+                <form onSubmit={handleChangeEmail} className="acct-form">
+                  <div className="acct-field">
+                    <label htmlFor="sa-ce-new-email">New Email Address</label>
+                    <input
+                      id="sa-ce-new-email"
+                      type="email"
+                      value={ceNewEmail}
+                      onChange={e => setCeNewEmail(e.target.value)}
+                      placeholder="newsuper@email.com"
+                      className="acct-input"
+                    />
+                  </div>
+                  <div className="acct-field">
+                    <label htmlFor="sa-ce-current-pwd">Current Password</label>
+                    <input
+                      id="sa-ce-current-pwd"
+                      type="password"
+                      value={ceCurrentPwd}
+                      onChange={e => setCeCurrentPwd(e.target.value)}
+                      placeholder="Enter current password to confirm"
+                      className="acct-input"
+                    />
+                  </div>
+                  <div className="acct-form-actions">
+                    <button type="submit" className="acct-submit-btn" disabled={ceLoading}>
+                      {ceLoading ? 'Updating…' : 'Update Email'}
+                    </button>
+                    <button type="button" className="acct-cancel-btn" onClick={() => setAcctView('main')}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Change Password Form */}
+            {acctView === 'password' && (
+              <div className="acct-modal-form-area">
+                <button className="acct-modal-back" onClick={() => setAcctView('main')}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                  Back
+                </button>
+                <h3 className="acct-modal-form-h3">Change SuperAdmin Password</h3>
+                {cpSuccess && <div className="acct-success">{cpSuccess}</div>}
+                {cpError   && <div className="acct-error">{cpError}</div>}
+                <form onSubmit={handleChangePassword} className="acct-form">
+                  <div className="acct-field">
+                    <label htmlFor="sa-cp-current">Current Password</label>
+                    <input
+                      id="sa-cp-current"
+                      type="password"
+                      value={cpCurrentPwd}
+                      onChange={e => setCpCurrentPwd(e.target.value)}
+                      placeholder="Enter current password"
+                      className="acct-input"
+                    />
+                  </div>
+                  <div className="acct-field">
+                    <label htmlFor="sa-cp-new">New Password</label>
+                    <input
+                      id="sa-cp-new"
+                      type="password"
+                      value={cpNewPwd}
+                      onChange={e => setCpNewPwd(e.target.value)}
+                      placeholder="Minimum 8 characters"
+                      className="acct-input"
+                    />
+                  </div>
+                  <div className="acct-field">
+                    <label htmlFor="sa-cp-confirm">Confirm New Password</label>
+                    <input
+                      id="sa-cp-confirm"
+                      type="password"
+                      value={cpConfirmPwd}
+                      onChange={e => setCpConfirmPwd(e.target.value)}
+                      placeholder="Re-enter new password"
+                      className="acct-input"
+                    />
+                  </div>
+                  <div className="acct-form-actions">
+                    <button type="submit" className="acct-submit-btn" disabled={cpLoading}>
+                      {cpLoading ? 'Changing…' : 'Change Password'}
+                    </button>
+                    <button type="button" className="acct-cancel-btn" onClick={() => setAcctView('main')}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
           </div>
         </div>
       )}

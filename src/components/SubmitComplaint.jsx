@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import getApiBase from '../utils/apiBase';
 
 export default function SubmitComplaint() {
   const navigate = useNavigate();
@@ -103,7 +104,7 @@ export default function SubmitComplaint() {
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000/api' : '/api');
+      const API_BASE = getApiBase();
       const response = await fetch(`${API_BASE}/complaints`, {
         method: 'POST',
         headers: {

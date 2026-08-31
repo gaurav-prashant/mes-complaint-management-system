@@ -58,8 +58,6 @@ button[kind="header"] {
 }
 
 #MainMenu,
-footer,
-header,
 [data-testid="stHeader"],
 [data-testid="stToolbar"],
 [data-testid="stDecoration"],
@@ -2702,19 +2700,13 @@ body,
     color: #17324d;
 }
 
-/* Force 100% UNIFORM CRISP BOLD WHITE COLOR FOR ALL FOOTER TEXT & LETTERS */
-footer,
-footer *,
-div[class*="footer"],
-div[class*="footer"] *,
-div[class*="footer"] p,
-div[class*="footer"] span:not(.track-footer-highlight),
-div[class*="footer"] a,
-div[class*="footer"] h1,
-div[class*="footer"] h2,
-div[class*="footer"] h3,
-div[class*="footer"] h4,
-div[class*="footer"] li {
+/* Force 100% UNIFORM CRISP BOLD WHITE COLOR FOR PUBLIC SITE FOOTER TEXT */
+.track-footer,
+.track-footer *,
+.custom-footer,
+.custom-footer *,
+.footer-wrapper,
+.footer-wrapper * {
     color: #ffffff !important;
     font-weight: 600 !important;
     opacity: 1 !important;

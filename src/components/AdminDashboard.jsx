@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import getApiBase from '../utils/apiBase';
 import {
   PieChart, Pie, Cell, Tooltip, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, ResponsiveContainer, Legend,
@@ -109,11 +110,11 @@ const icons = {
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG = {
-  Submitted:   { cls: 'badge-submitted',   dot: '#64748b' },
-  Pending:     { cls: 'badge-pending',     dot: '#f97316' },
+  Submitted: { cls: 'badge-submitted', dot: '#64748b' },
+  Pending: { cls: 'badge-pending', dot: '#f97316' },
   'In Progress': { cls: 'badge-inprogress', dot: '#3b82f6' },
-  Resolved:    { cls: 'badge-resolved',    dot: '#10b981' },
-  Rejected:    { cls: 'badge-rejected',    dot: '#ef4444' },
+  Resolved: { cls: 'badge-resolved', dot: '#10b981' },
+  Rejected: { cls: 'badge-rejected', dot: '#ef4444' },
 };
 
 function StatusBadge({ status }) {
@@ -129,11 +130,11 @@ function StatusBadge({ status }) {
 // ─── Chart Colors ─────────────────────────────────────────────────────────────
 
 const PIE_COLORS = {
-  Submitted:    '#64748b',
-  Pending:      '#f97316',
-  'In Progress':'#3b82f6',
-  Resolved:     '#10b981',
-  Rejected:     '#ef4444',
+  Submitted: '#64748b',
+  Pending: '#f97316',
+  'In Progress': '#3b82f6',
+  Resolved: '#10b981',
+  Rejected: '#ef4444',
 };
 const BAR_COLOR = '#3b82f6';
 const LINE_COLOR = '#6366f1';
@@ -163,17 +164,38 @@ export default function AdminDashboard() {
   const [error, setError] = useState('');
 
   // Filter states
-  const [searchTerm, setSearchTerm]   = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
-  const [typeFilter, setTypeFilter]   = useState('All Types');
+  const [typeFilter, setTypeFilter] = useState('All Types');
 
   // Modal state
   const [selectedComplaint, setSelectedComplaint] = useState(null);
-  const [editStatus, setEditStatus]   = useState('');
+  const [editStatus, setEditStatus] = useState('');
   const [editRemarks, setEditRemarks] = useState('');
   const [notification, setNotification] = useState('');
 
+  // ── Account Settings state ───────────────────────────────────────────────────
+  const [adminEmail, setAdminEmail]     = useState('');
+  const [acctModalOpen, setAcctModalOpen] = useState(false);
+  const [acctView, setAcctView]         = useState('main'); // 'main' | 'email' | 'password'
+
+  // Change Email form state
+  const [ceNewEmail, setCeNewEmail]     = useState('');
+  const [ceCurrentPwd, setCeCurrentPwd] = useState('');
+  const [ceError, setCeError]           = useState('');
+  const [ceSuccess, setCeSuccess]       = useState('');
+  const [ceLoading, setCeLoading]       = useState(false);
+
+  // Change Password form state
+  const [cpCurrentPwd, setCpCurrentPwd] = useState('');
+  const [cpNewPwd, setCpNewPwd]         = useState('');
+  const [cpConfirmPwd, setCpConfirmPwd] = useState('');
+  const [cpError, setCpError]           = useState('');
+  const [cpSuccess, setCpSuccess]       = useState('');
+  const [cpLoading, setCpLoading]       = useState(false);
+
   // ── Fetch ────────────────────────────────────────────────────────────────────
+
 
   const fetchComplaints = async () => {
     setIsLoading(true);
@@ -181,9 +203,25 @@ export default function AdminDashboard() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000/api' : '/api');
-      const response = await fetch(`${API_BASE}/complaints`, { signal: controller.signal });
+      const API_BASE = getApiBase();
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_BASE}/complaints`, {
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+      });
       clearTimeout(timeoutId);
+      if (response.status === 401) {
+        // Session expired or token invalid — force re-login
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminAuthenticated');
+        sessionStorage.removeItem('adminToken');
+        sessionStorage.removeItem('adminAuthenticated');
+        navigate('/admin/login', { replace: true });
+        return;
+      }
       let data;
       try { data = await response.json(); } catch { throw new Error('Invalid JSON response from server'); }
       if (!response.ok || !data.success) throw new Error(data?.message || 'Failed to fetch data');
@@ -197,13 +235,47 @@ export default function AdminDashboard() {
     }
   };
 
+  // ── Auth Guard — token-based ────────────────────────────────────────────────
+
   useEffect(() => {
-    const isAuthenticated = localStorage.getItem('adminAuthenticated') === 'true';
-    if (!isAuthenticated) {
+    const token = localStorage.getItem('adminToken');
+
+    // No token at all → redirect immediately
+    if (!token) {
+      localStorage.removeItem('adminAuthenticated');
+      sessionStorage.removeItem('adminAuthenticated');
+      sessionStorage.removeItem('adminToken');
       navigate('/admin/login', { replace: true });
       return;
     }
+
+    // Client-side expiry check (decode payload only — NOT used as proof of auth)
+    try {
+      const payloadBase64 = token.split('.')[1];
+      if (payloadBase64) {
+        const payload = JSON.parse(atob(payloadBase64));
+        if (payload.exp && Date.now() / 1000 > payload.exp) {
+          // Token is expired — clear everything and redirect
+          localStorage.removeItem('adminToken');
+          localStorage.removeItem('adminAuthenticated');
+          sessionStorage.removeItem('adminToken');
+          sessionStorage.removeItem('adminAuthenticated');
+          navigate('/admin/login', { replace: true });
+          return;
+        }
+      }
+    } catch {
+      // Malformed token — treat as missing
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminAuthenticated');
+      sessionStorage.removeItem('adminToken');
+      sessionStorage.removeItem('adminAuthenticated');
+      navigate('/admin/login', { replace: true });
+      return;
+    }
+
     fetchComplaints();
+    fetchAdminProfile();
   }, [navigate]);
 
   // ── Logout ───────────────────────────────────────────────────────────────────
@@ -215,6 +287,154 @@ export default function AdminDashboard() {
     sessionStorage.removeItem('adminToken');
     navigate('/admin/login', { replace: true });
   };
+
+  // ── Fetch Admin Profile ───────────────────────────────────────────────────────
+
+  const fetchAdminProfile = async () => {
+    try {
+      const API_BASE = getApiBase();
+      const token = localStorage.getItem('adminToken');
+      if (!token) return;
+      const response = await fetch(`${API_BASE}/admin/profile`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
+      const data = await response.json();
+      if (data.success && data.admin) {
+        setAdminEmail(data.admin.email);
+      }
+    } catch (err) {
+      console.error('[Profile]', err.message);
+    }
+  };
+
+  // ── Change Email ──────────────────────────────────────────────────────────────
+
+  const handleChangeEmail = async (e) => {
+    e.preventDefault();
+    setCeError('');
+    setCeSuccess('');
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!ceNewEmail || !emailRegex.test(ceNewEmail)) {
+      setCeError('Please enter a valid new email address');
+      return;
+    }
+    if (!ceCurrentPwd) {
+      setCeError('Current password is required');
+      return;
+    }
+
+    setCeLoading(true);
+    try {
+      const API_BASE = getApiBase();
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_BASE}/admin/change-email`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ newEmail: ceNewEmail, currentPassword: ceCurrentPwd }),
+      });
+      const data = await response.json();
+
+      if (response.status === 401 && !data.success && data.message === 'Current password is incorrect') {
+        setCeError('Current password is incorrect');
+        return;
+      }
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
+      if (response.status === 409) {
+        setCeError(data.message || 'Email is already in use');
+        return;
+      }
+      if (!data.success) {
+        setCeError(data.message || 'Failed to update email');
+        return;
+      }
+
+      // Session is invalidated — clear session immediately and redirect to login
+      setCeSuccess('Email updated successfully! Redirecting to login…');
+      setCeNewEmail('');
+      setCeCurrentPwd('');
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminAuthenticated');
+      sessionStorage.removeItem('adminToken');
+      sessionStorage.removeItem('adminAuthenticated');
+      setTimeout(() => {
+        navigate('/admin/login', { replace: true });
+      }, 1500);
+    } catch (err) {
+      setCeError('Failed to update email. Please try again.');
+    } finally {
+      setCeLoading(false);
+    }
+  };
+
+  // ── Change Password ───────────────────────────────────────────────────────────
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setCpError('');
+    setCpSuccess('');
+
+    if (!cpCurrentPwd) { setCpError('Current password is required'); return; }
+    if (!cpNewPwd)      { setCpError('New password is required'); return; }
+    if (cpNewPwd.length < 8) { setCpError('New password must be at least 8 characters'); return; }
+    if (cpNewPwd !== cpConfirmPwd) { setCpError('Passwords do not match'); return; }
+
+    setCpLoading(true);
+    try {
+      const API_BASE = getApiBase();
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_BASE}/admin/change-password`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ currentPassword: cpCurrentPwd, newPassword: cpNewPwd }),
+      });
+      const data = await response.json();
+
+      if (response.status === 401 && data.message === 'Current password is incorrect') {
+        setCpError('Current password is incorrect');
+        return;
+      }
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
+      if (!data.success) {
+        setCpError(data.message || 'Failed to change password');
+        return;
+      }
+
+      // Force re-login — clear token and redirect after a brief message
+      setCpSuccess('Password changed successfully! Redirecting to login…');
+      setCpCurrentPwd('');
+      setCpNewPwd('');
+      setCpConfirmPwd('');
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminAuthenticated');
+      sessionStorage.removeItem('adminToken');
+      sessionStorage.removeItem('adminAuthenticated');
+      setTimeout(() => {
+        navigate('/admin/login', { replace: true });
+      }, 1500);
+    } catch (err) {
+      setCpError('Failed to change password. Please try again.');
+    } finally {
+      setCpLoading(false);
+    }
+  };
+
 
   // ── Modal ────────────────────────────────────────────────────────────────────
 
@@ -230,12 +450,24 @@ export default function AdminDashboard() {
     if (!selectedComplaint) return;
     const targetId = selectedComplaint._id || selectedComplaint.complaintId;
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000/api' : '/api');
+      const API_BASE = getApiBase();
+      const token = localStorage.getItem('adminToken');
       const response = await fetch(`${API_BASE}/complaints/${targetId}/status`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ status: editStatus, admin_remarks: editRemarks }),
       });
+      if (response.status === 401) {
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminAuthenticated');
+        sessionStorage.removeItem('adminToken');
+        sessionStorage.removeItem('adminAuthenticated');
+        navigate('/admin/login', { replace: true });
+        return;
+      }
       if (!response.ok) throw new Error('Update failed');
       setNotification('Complaint updated successfully.');
       setComplaints(prev => prev.map(c => {
@@ -253,12 +485,12 @@ export default function AdminDashboard() {
 
   // ── KPI Calculations (from real complaints only) ──────────────────────────────
 
-  const totalComplaints  = complaints.length;
-  const submittedCount   = complaints.filter(c => c?.status === 'Submitted').length;
-  const pendingCount     = complaints.filter(c => c?.status === 'Pending').length;
-  const inProgressCount  = complaints.filter(c => c?.status === 'In Progress').length;
-  const resolvedCount    = complaints.filter(c => c?.status === 'Resolved').length;
-  const rejectedCount    = complaints.filter(c => c?.status === 'Rejected').length;
+  const totalComplaints = complaints.length;
+  const submittedCount = complaints.filter(c => c?.status === 'Submitted').length;
+  const pendingCount = complaints.filter(c => c?.status === 'Pending').length;
+  const inProgressCount = complaints.filter(c => c?.status === 'In Progress').length;
+  const resolvedCount = complaints.filter(c => c?.status === 'Resolved').length;
+  const rejectedCount = complaints.filter(c => c?.status === 'Rejected').length;
 
   // ── Unique Types (dynamic) ────────────────────────────────────────────────────
 
@@ -273,14 +505,14 @@ export default function AdminDashboard() {
 
   const filteredComplaints = useMemo(() => complaints.filter(c => {
     if (!c) return false;
-    const cId     = String(c.complaintId || c._id || '').toLowerCase();
-    const cName   = String(c.name || c.fullName || '').toLowerCase();
+    const cId = String(c.complaintId || c._id || '').toLowerCase();
+    const cName = String(c.name || c.fullName || '').toLowerCase();
     const cMobile = String(c.mobile || '').toLowerCase();
-    const cLoc    = String(c.location || '').toLowerCase();
-    const sl      = searchTerm.toLowerCase();
-    const matchesSearch  = cId.includes(sl) || cName.includes(sl) || cMobile.includes(sl) || cLoc.includes(sl);
-    const matchesStatus  = statusFilter === 'All Status' || c.status === statusFilter;
-    const rawType  = c.complaint_type || c.type || c.complaintType || '';
+    const cLoc = String(c.location || '').toLowerCase();
+    const sl = searchTerm.toLowerCase();
+    const matchesSearch = cId.includes(sl) || cName.includes(sl) || cMobile.includes(sl) || cLoc.includes(sl);
+    const matchesStatus = statusFilter === 'All Status' || c.status === statusFilter;
+    const rawType = c.complaint_type || c.type || c.complaintType || '';
     const cleanType = String(rawType).split('/')[0].trim();
     const matchesType = typeFilter === 'All Types' || cleanType === typeFilter;
     return matchesSearch && matchesStatus && matchesType;
@@ -290,11 +522,11 @@ export default function AdminDashboard() {
 
   // 1. Pie – status distribution
   const statusData = useMemo(() => [
-    { name: 'Submitted',   value: submittedCount,  fill: PIE_COLORS['Submitted'] },
-    { name: 'Pending',     value: pendingCount,     fill: PIE_COLORS['Pending'] },
-    { name: 'In Progress', value: inProgressCount,  fill: PIE_COLORS['In Progress'] },
-    { name: 'Resolved',    value: resolvedCount,    fill: PIE_COLORS['Resolved'] },
-    { name: 'Rejected',    value: rejectedCount,    fill: PIE_COLORS['Rejected'] },
+    { name: 'Submitted', value: submittedCount, fill: PIE_COLORS['Submitted'] },
+    { name: 'Pending', value: pendingCount, fill: PIE_COLORS['Pending'] },
+    { name: 'In Progress', value: inProgressCount, fill: PIE_COLORS['In Progress'] },
+    { name: 'Resolved', value: resolvedCount, fill: PIE_COLORS['Resolved'] },
+    { name: 'Rejected', value: rejectedCount, fill: PIE_COLORS['Rejected'] },
   ].filter(d => d.value > 0), [submittedCount, pendingCount, inProgressCount, resolvedCount, rejectedCount]);
 
   // 2. Bar – top complaint types
@@ -355,12 +587,12 @@ export default function AdminDashboard() {
   // ── KPI Card Config ───────────────────────────────────────────────────────────
 
   const kpiCards = [
-    { label: 'Total Complaints', value: totalComplaints, cls: 'kpi-total',      iconColor: '#1e3a5f', bg: 'linear-gradient(135deg,#1e3a5f,#2563eb)', icon: icons.list,       textColor: '#1e3a5f' },
-    { label: 'Submitted',        value: submittedCount,  cls: 'kpi-submitted',  iconColor: '#475569', bg: 'linear-gradient(135deg,#475569,#64748b)', icon: icons.calendar,   textColor: '#475569' },
-    { label: 'Pending',          value: pendingCount,    cls: 'kpi-pending',    iconColor: '#c2410c', bg: 'linear-gradient(135deg,#f97316,#fb923c)', icon: icons.clock,      textColor: '#c2410c' },
-    { label: 'In Progress',      value: inProgressCount, cls: 'kpi-progress',   iconColor: '#1d4ed8', bg: 'linear-gradient(135deg,#3b82f6,#60a5fa)', icon: icons.shield,     textColor: '#1d4ed8' },
-    { label: 'Resolved',         value: resolvedCount,   cls: 'kpi-resolved',   iconColor: '#15803d', bg: 'linear-gradient(135deg,#10b981,#34d399)', icon: icons.check,      textColor: '#15803d' },
-    { label: 'Rejected',         value: rejectedCount,   cls: 'kpi-rejected',   iconColor: '#b91c1c', bg: 'linear-gradient(135deg,#ef4444,#f87171)', icon: icons.xCircle,    textColor: '#b91c1c' },
+    { label: 'Total Complaints', value: totalComplaints, cls: 'kpi-total', iconColor: '#1e3a5f', bg: 'linear-gradient(135deg,#1e3a5f,#2563eb)', icon: icons.list, textColor: '#1e3a5f' },
+    { label: 'Submitted', value: submittedCount, cls: 'kpi-submitted', iconColor: '#475569', bg: 'linear-gradient(135deg,#475569,#64748b)', icon: icons.calendar, textColor: '#475569' },
+    { label: 'Pending', value: pendingCount, cls: 'kpi-pending', iconColor: '#c2410c', bg: 'linear-gradient(135deg,#f97316,#fb923c)', icon: icons.clock, textColor: '#c2410c' },
+    { label: 'In Progress', value: inProgressCount, cls: 'kpi-progress', iconColor: '#1d4ed8', bg: 'linear-gradient(135deg,#3b82f6,#60a5fa)', icon: icons.shield, textColor: '#1d4ed8' },
+    { label: 'Resolved', value: resolvedCount, cls: 'kpi-resolved', iconColor: '#15803d', bg: 'linear-gradient(135deg,#10b981,#34d399)', icon: icons.check, textColor: '#15803d' },
+    { label: 'Rejected', value: rejectedCount, cls: 'kpi-rejected', iconColor: '#b91c1c', bg: 'linear-gradient(135deg,#ef4444,#f87171)', icon: icons.xCircle, textColor: '#b91c1c' },
   ];
 
   // ── System Status ─────────────────────────────────────────────────────────────
@@ -368,7 +600,7 @@ export default function AdminDashboard() {
   const sysStatus = error ? 'offline' : isLoading ? 'connecting' : 'online';
   const sysLabels = { online: 'System Online', connecting: 'Connecting...', offline: 'System Offline' };
   const sysDotColors = { online: '#10b981', connecting: '#f59e0b', offline: '#ef4444' };
-  const sysBgColors  = { online: 'rgba(16,185,129,0.1)', connecting: 'rgba(245,158,11,0.1)', offline: 'rgba(239,68,68,0.1)' };
+  const sysBgColors = { online: 'rgba(16,185,129,0.1)', connecting: 'rgba(245,158,11,0.1)', offline: 'rgba(239,68,68,0.1)' };
   const sysTextColors = { online: '#065f46', connecting: '#92400e', offline: '#991b1b' };
 
   // ─── Render ──────────────────────────────────────────────────────────────────
@@ -397,15 +629,15 @@ export default function AdminDashboard() {
 
           <button
             type="button"
-            className="adm-refresh-btn"
-            onClick={fetchComplaints}
-            aria-label="Refresh Data"
+            className="adm-header-settings-btn"
+            onClick={() => { setAcctModalOpen(true); setAcctView('main'); setCeError(''); setCeSuccess(''); setCpError(''); setCpSuccess(''); }}
+            aria-label="Account Settings"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
-            <span>Refresh Data</span>
+            <span>Account Settings</span>
           </button>
 
           <button
@@ -485,10 +717,10 @@ export default function AdminDashboard() {
               <div className="adm-qa-label">Quick Filters</div>
               <div className="adm-qa-buttons">
                 {[
-                  { label: 'View Pending',     status: 'Pending',     color: '#f97316', bg: '#fff7ed', border: '#fdba74' },
+                  { label: 'View Pending', status: 'Pending', color: '#f97316', bg: '#fff7ed', border: '#fdba74' },
                   { label: 'View In Progress', status: 'In Progress', color: '#3b82f6', bg: '#eff6ff', border: '#93c5fd' },
-                  { label: 'View Resolved',    status: 'Resolved',    color: '#10b981', bg: '#f0fdf4', border: '#6ee7b7' },
-                  { label: 'View Rejected',    status: 'Rejected',    color: '#ef4444', bg: '#fef2f2', border: '#fca5a5' },
+                  { label: 'View Resolved', status: 'Resolved', color: '#10b981', bg: '#f0fdf4', border: '#6ee7b7' },
+                  { label: 'View Rejected', status: 'Rejected', color: '#ef4444', bg: '#fef2f2', border: '#fca5a5' },
                 ].map(btn => (
                   <button
                     key={btn.status}
@@ -595,13 +827,13 @@ export default function AdminDashboard() {
                   <tbody>
                     {filteredComplaints.length > 0 ? (
                       filteredComplaints.map((c, rowIdx) => {
-                        const displayId       = c.complaintId || c._id;
-                        const displayName     = c.name || c.fullName || 'N/A';
-                        const displayMobile   = c.mobile || 'N/A';
-                        const displayType     = String(c.complaint_type || c.type || c.complaintType || '').split('/')[0].trim() || 'N/A';
+                        const displayId = c.complaintId || c._id;
+                        const displayName = c.name || c.fullName || 'N/A';
+                        const displayMobile = c.mobile || 'N/A';
+                        const displayType = String(c.complaint_type || c.type || c.complaintType || '').split('/')[0].trim() || 'N/A';
                         const displayLocation = c.location || 'N/A';
-                        const displayQuarter  = c.quarter || 'N/A';
-                        const displayDate     = formatDate(c.created_at || c.submittedAt || c.submittedDate);
+                        const displayQuarter = c.quarter || 'N/A';
+                        const displayDate = formatDate(c.created_at || c.submittedAt || c.submittedDate);
                         return (
                           <tr key={displayId} className={rowIdx % 2 === 1 ? 'adm-tr-alt' : ''}>
                             <td className="adm-td-id">#{String(displayId).slice(-6).toUpperCase()}</td>
@@ -736,7 +968,7 @@ export default function AdminDashboard() {
                           <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                             <defs>
                               <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.25} />
+                                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
                                 <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                               </linearGradient>
                             </defs>
@@ -784,21 +1016,188 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      {/* ══ ADMIN ACCOUNT & LOGOUT SECTION ════════════════════════════════════ */}
-      <section className="adm-account-section">
-        <h3 className="adm-account-heading">Admin Account</h3>
-        <button
-          type="button"
-          className="adm-footer-logout-btn"
-          onClick={handleLogout}
-          aria-label="Logout"
+
+
+      {/* ══ ACCOUNT SETTINGS MODAL ════════════════════════════════════════ */}
+      {acctModalOpen && (
+        <div
+          className="acct-modal-overlay"
+          onClick={e => e.target === e.currentTarget && setAcctModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Account Settings"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-          <span>Logout</span>
-        </button>
-      </section>
+          <div className="acct-modal">
+
+            {/* Modal Header */}
+            <div className="acct-modal-header">
+              <div className="acct-modal-title-group">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+                <h2 className="acct-modal-h2">Account Settings</h2>
+              </div>
+              <button className="adm-modal-close-btn" onClick={() => setAcctModalOpen(false)} aria-label="Close">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Current Email display */}
+            <div className="acct-modal-email-row">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" />
+              </svg>
+              <span className="acct-modal-email-label">Signed in as</span>
+              <span className="acct-modal-email-value">{adminEmail || '—'}</span>
+            </div>
+
+            {/* Tab nav */}
+            {acctView === 'main' && (
+              <div className="acct-modal-tabs">
+                <button
+                  className="acct-modal-tab-btn"
+                  onClick={() => { setAcctView('email'); setCeError(''); setCeSuccess(''); setCeNewEmail(''); setCeCurrentPwd(''); }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" />
+                  </svg>
+                  <div>
+                    <span className="acct-tab-title">Change Email</span>
+                    <span className="acct-tab-desc">Update your admin email address</span>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+                <button
+                  className="acct-modal-tab-btn"
+                  onClick={() => { setAcctView('password'); setCpError(''); setCpSuccess(''); setCpCurrentPwd(''); setCpNewPwd(''); setCpConfirmPwd(''); }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  <div>
+                    <span className="acct-tab-title">Change Password</span>
+                    <span className="acct-tab-desc">Update your admin password</span>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+              </div>
+            )}
+
+            {/* Change Email Form */}
+            {acctView === 'email' && (
+              <div className="acct-modal-form-area">
+                <button className="acct-modal-back" onClick={() => setAcctView('main')}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                  Back
+                </button>
+                <h3 className="acct-modal-form-h3">Change Email</h3>
+                {ceSuccess && <div className="acct-success">{ceSuccess}</div>}
+                {ceError   && <div className="acct-error">{ceError}</div>}
+                <form onSubmit={handleChangeEmail} className="acct-form">
+                  <div className="acct-field">
+                    <label htmlFor="ce-new-email">New Email Address</label>
+                    <input
+                      id="ce-new-email"
+                      type="email"
+                      value={ceNewEmail}
+                      onChange={e => setCeNewEmail(e.target.value)}
+                      placeholder="new@email.com"
+                      className="acct-input"
+                    />
+                  </div>
+                  <div className="acct-field">
+                    <label htmlFor="ce-current-pwd">Current Password</label>
+                    <input
+                      id="ce-current-pwd"
+                      type="password"
+                      value={ceCurrentPwd}
+                      onChange={e => setCeCurrentPwd(e.target.value)}
+                      placeholder="Enter current password to confirm"
+                      className="acct-input"
+                    />
+                  </div>
+                  <div className="acct-form-actions">
+                    <button type="submit" className="acct-submit-btn" disabled={ceLoading}>
+                      {ceLoading ? 'Updating…' : 'Update Email'}
+                    </button>
+                    <button type="button" className="acct-cancel-btn" onClick={() => setAcctView('main')}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Change Password Form */}
+            {acctView === 'password' && (
+              <div className="acct-modal-form-area">
+                <button className="acct-modal-back" onClick={() => setAcctView('main')}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                  Back
+                </button>
+                <h3 className="acct-modal-form-h3">Change Password</h3>
+                {cpSuccess && <div className="acct-success">{cpSuccess}</div>}
+                {cpError   && <div className="acct-error">{cpError}</div>}
+                <form onSubmit={handleChangePassword} className="acct-form">
+                  <div className="acct-field">
+                    <label htmlFor="cp-current">Current Password</label>
+                    <input
+                      id="cp-current"
+                      type="password"
+                      value={cpCurrentPwd}
+                      onChange={e => setCpCurrentPwd(e.target.value)}
+                      placeholder="Enter current password"
+                      className="acct-input"
+                    />
+                  </div>
+                  <div className="acct-field">
+                    <label htmlFor="cp-new">New Password</label>
+                    <input
+                      id="cp-new"
+                      type="password"
+                      value={cpNewPwd}
+                      onChange={e => setCpNewPwd(e.target.value)}
+                      placeholder="Minimum 8 characters"
+                      className="acct-input"
+                    />
+                  </div>
+                  <div className="acct-field">
+                    <label htmlFor="cp-confirm">Confirm New Password</label>
+                    <input
+                      id="cp-confirm"
+                      type="password"
+                      value={cpConfirmPwd}
+                      onChange={e => setCpConfirmPwd(e.target.value)}
+                      placeholder="Re-enter new password"
+                      className="acct-input"
+                    />
+                  </div>
+                  <div className="acct-form-actions">
+                    <button type="submit" className="acct-submit-btn" disabled={cpLoading}>
+                      {cpLoading ? 'Changing…' : 'Change Password'}
+                    </button>
+                    <button type="button" className="acct-cancel-btn" onClick={() => setAcctView('main')}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
 
       {/* ══ COMPLAINT DETAILS MODAL ═══════════════════════════════════════════ */}
       {selectedComplaint && (
@@ -821,6 +1220,8 @@ export default function AdminDashboard() {
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
+
+
               </button>
             </div>
 

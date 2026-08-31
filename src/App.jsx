@@ -12,6 +12,8 @@ import AdminDashboard from './components/AdminDashboard'
 import AdminLogin from './components/AdminLogin'
 import SuperAdminLogin from './components/SuperAdminLogin'
 import SuperAdminDashboard from './components/SuperAdminDashboard'
+import SuperAdminResetPassword from './components/SuperAdminResetPassword'
+import AdminResetPassword from './components/AdminResetPassword'
 
 import CTA from './components/CTA'
 
@@ -31,7 +33,7 @@ function App() {
     <BrowserRouter>
       <div className="app-container" style={{ background: '#f7f9fc', minHeight: '100vh', width: '100%', maxWidth: '100vw', overflowX: 'hidden', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
         <Navbar />
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/submit-complaint" element={<SubmitComplaint />} />
@@ -43,6 +45,8 @@ function App() {
             <Route path="/super-admin" element={<SuperAdminLogin />} />
             <Route path="/super-admin/login" element={<SuperAdminLogin />} />
             <Route path="/super-admin/dashboard" element={<SuperAdminDashboard />} />
+            <Route path="/super-admin/reset-password" element={<SuperAdminResetPassword />} />
+            <Route path="/admin/reset-password" element={<AdminResetPassword />} />
           </Routes>
         </div>
         <Footer />
