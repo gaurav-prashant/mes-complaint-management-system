@@ -75,37 +75,91 @@ let adminsCollection;
 let adminPasswordResetsCollection;
 let superAdminsCollection;
 let superAdminPasswordResetsCollection;
+let connectingPromise = null;
+
+// ─── DB Connection Health & Reset Helpers ─────────────────────────────────────
+
+async function resetDBHandles() {
+  if (client) {
+    try { await client.close(true); } catch (e) {}
+  }
+  client = null;
+  db = null;
+  complaintsCollection = null;
+  adminsCollection = null;
+  adminPasswordResetsCollection = null;
+  superAdminsCollection = null;
+  superAdminPasswordResetsCollection = null;
+  connectingPromise = null;
+}
+
+async function isConnectionAlive() {
+  if (!client || !db) return false;
+  try {
+    await db.command({ ping: 1 });
+    return true;
+  } catch (err) {
+    console.warn('[DB] Connection health check failed (stale socket detected):', err.message);
+    return false;
+  }
+}
 
 // ─── DB Connect ───────────────────────────────────────────────────────────────
 
 async function connectDB() {
-  if (complaintsCollection) return complaintsCollection;
   if (!MONGO_URI) {
     console.error('[DB] MONGO_URI is missing in .env');
     return null;
   }
-  try {
-    if (!client) {
-      client = new MongoClient(MONGO_URI, {
-        serverSelectionTimeoutMS: 5000,
-        connectTimeoutMS: 5000,
-      });
-      await client.connect();
+
+  // Fast path: if cached collection handles exist, verify connection health
+  if (complaintsCollection && client && db) {
+    const alive = await isConnectionAlive();
+    if (alive) {
+      return complaintsCollection;
     }
-    db = client.db('mes_complaint_db');
-    complaintsCollection            = db.collection('complaints');
-    adminsCollection                = db.collection('admins');
-    adminPasswordResetsCollection   = db.collection('adminPasswordResets');
-    superAdminsCollection           = db.collection('superadmins');
-    superAdminPasswordResetsCollection = db.collection('superAdminPasswordResets');
-    console.log('[DB] MongoDB connected successfully');
-    console.log(`[DB] Connected Database: ${db.databaseName}`);
-    console.log(`[DB] Complaints Collection: ${complaintsCollection.collectionName}`);
-    return complaintsCollection;
-  } catch (err) {
-    console.error('[DB] MongoDB connection error:', err.message || err);
-    return null;
+    console.warn('[DB] Re-establishing stale MongoDB connection...');
+    await resetDBHandles();
   }
+
+  // Prevent concurrent request connection races in serverless cold/warm starts
+  if (connectingPromise) {
+    return connectingPromise;
+  }
+
+  connectingPromise = (async () => {
+    try {
+      if (!client) {
+        client = new MongoClient(MONGO_URI, {
+          serverSelectionTimeoutMS: 5000,
+          connectTimeoutMS: 5000,
+          socketTimeoutMS: 45000,
+          maxPoolSize: 10,
+        });
+        await client.connect();
+      }
+
+      db = client.db('mes_complaint_db');
+      await db.command({ ping: 1 });
+
+      complaintsCollection                = db.collection('complaints');
+      adminsCollection                    = db.collection('admins');
+      adminPasswordResetsCollection       = db.collection('adminPasswordResets');
+      superAdminsCollection               = db.collection('superadmins');
+      superAdminPasswordResetsCollection  = db.collection('superAdminPasswordResets');
+
+      console.log('[DB] MongoDB connected & verified successfully');
+      return complaintsCollection;
+    } catch (err) {
+      console.error('[DB] MongoDB connection error:', err.message || err);
+      await resetDBHandles();
+      return null;
+    } finally {
+      connectingPromise = null;
+    }
+  })();
+
+  return connectingPromise;
 }
 
 // ─── Ensure Default Admin Exists (hashed & synchronized) ─────────────────────
