@@ -266,7 +266,7 @@ connectDB().then(async () => {
 });
 
 app.use(async (req, res, next) => {
-  if (!complaintsCollection && !req.url.includes('/admin/login') && !req.url.includes('/super-admin/login')) {
+  if (!complaintsCollection || !adminsCollection) {
     try {
       await connectDB();
       if (adminsCollection) await ensureAdminExists();
