@@ -7,8 +7,16 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { Resend } from 'resend';
 import os from 'os';
+import dns from 'dns';
 
 dotenv.config();
+
+// Ensure public DNS fallback for SRV lookup on Windows environments
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch (dnsErr) {
+  console.warn('[DB] Custom DNS setup warning:', dnsErr.message);
+}
 
 const app = express();
 app.use(cors());
@@ -75,16 +83,8 @@ async function connectDB() {
     return null;
   }
   try {
-    let finalUri = MONGO_URI;
-
-    // Bypass Node.js SRV resolution bug by using direct replica set nodes
-    if (MONGO_URI.includes('cluster0.y85m2k4.mongodb.net')) {
-      const authPart = MONGO_URI.split('@')[0].replace('mongodb+srv://', '');
-      finalUri = `mongodb://${authPart}@ac-bqi0hjs-shard-00-00.y85m2k4.mongodb.net:27017,ac-bqi0hjs-shard-00-01.y85m2k4.mongodb.net:27017,ac-bqi0hjs-shard-00-02.y85m2k4.mongodb.net:27017/?ssl=true&replicaSet=atlas-28odxw-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Cluster0`;
-    }
-
     if (!client) {
-      client = new MongoClient(finalUri);
+      client = new MongoClient(MONGO_URI);
       await client.connect();
     }
     db = client.db('mes_complaint_db');
@@ -94,9 +94,11 @@ async function connectDB() {
     superAdminsCollection           = db.collection('superadmins');
     superAdminPasswordResetsCollection = db.collection('superAdminPasswordResets');
     console.log('[DB] MongoDB connected successfully');
+    console.log(`[DB] Connected Database: ${db.databaseName}`);
+    console.log(`[DB] Complaints Collection: ${complaintsCollection.collectionName}`);
     return complaintsCollection;
   } catch (err) {
-    console.error('[DB] MongoDB connection error:', err);
+    console.error('[DB] MongoDB connection error:', err.message || err);
     return null;
   }
 }
@@ -794,19 +796,74 @@ app.post(['/api/admin/reset-password', '/admin/reset-password'], async (req, res
 // No auth required — public users submit complaints
 
 app.post(['/api/complaints', '/complaints'], async (req, res) => {
+  console.log('[POST /api/complaints] Request received for complaint submission');
   try {
-    if (!complaintsCollection) {
-      return res.status(500).json({ success: false, message: 'Unable to connect to MongoDB' });
+    if (!complaintsCollection || !db) {
+      console.log('[POST /api/complaints] Database handle missing, attempting connectDB()...');
+      await connectDB();
     }
+    if (!complaintsCollection || !db) {
+      console.error('[POST /api/complaints] Connection Failed: Database handle unavailable');
+      return res.status(500).json({ success: false, message: 'Database connection unavailable' });
+    }
+
+    console.log(`[POST /api/complaints] Database Name: ${db.databaseName}`);
+    console.log(`[POST /api/complaints] Collection Name: ${complaintsCollection.collectionName}`);
+
     const newComplaint = {
       ...req.body,
       created_at: new Date().toISOString().split('T')[0],
     };
+
     const result = await complaintsCollection.insertOne(newComplaint);
-    res.status(201).json({ success: true, complaint: { ...newComplaint, _id: result.insertedId } });
+
+    if (result.acknowledged && result.insertedId) {
+      console.log(`[POST /api/complaints] insertOne SUCCESS — Inserted Document ID: ${result.insertedId}`);
+      return res.status(201).json({ success: true, complaint: { ...newComplaint, _id: result.insertedId } });
+    } else {
+      console.error('[POST /api/complaints] insertOne FAILURE — Write not acknowledged by MongoDB');
+      return res.status(500).json({ success: false, message: 'Failed to insert complaint into database' });
+    }
   } catch (error) {
-    console.error('Error adding complaint:', error);
-    res.status(500).json({ success: false, message: 'Failed to submit complaint' });
+    console.error('[POST /api/complaints] insertOne EXCEPTION:', error.message || error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to submit complaint' });
+  }
+});
+
+// ─── Public: Track complaints by mobile number or complaint ID ────────────────
+app.get(['/api/complaints/track/:query', '/complaints/track/:query'], async (req, res) => {
+  const { query } = req.params;
+  try {
+    if (!complaintsCollection) {
+      await connectDB();
+    }
+    if (!complaintsCollection) {
+      return res.status(500).json({ success: false, message: 'Database connection unavailable' });
+    }
+
+    const cleanQuery = decodeURIComponent(query || '').trim();
+    let records = [];
+
+    // Search by ObjectId if 24 hex characters
+    if (ObjectId.isValid(cleanQuery) && String(new ObjectId(cleanQuery)) === cleanQuery) {
+      const doc = await complaintsCollection.findOne({ _id: new ObjectId(cleanQuery) });
+      if (doc) records.push(doc);
+    }
+
+    // Search by complaintId field if not found by _id
+    if (records.length === 0) {
+      records = await complaintsCollection.find({ complaintId: cleanQuery }).toArray();
+    }
+
+    // Search by mobile number if not found by complaintId
+    if (records.length === 0) {
+      records = await complaintsCollection.find({ mobile: cleanQuery }).sort({ _id: -1 }).toArray();
+    }
+
+    res.json({ success: true, complaints: records });
+  } catch (error) {
+    console.error('[Track] Error searching complaints:', error.message || error);
+    res.status(500).json({ success: false, message: 'Failed to fetch tracking data' });
   }
 });
 
@@ -817,7 +874,10 @@ app.get(['/api/complaints/:id', '/complaints/:id'], async (req, res) => {
   const { id } = req.params;
   try {
     if (!complaintsCollection) {
-      return res.status(500).json({ success: false, message: 'Unable to connect to MongoDB' });
+      await connectDB();
+    }
+    if (!complaintsCollection) {
+      return res.status(500).json({ success: false, message: 'Database connection unavailable' });
     }
 
     // First try by complaintId field
@@ -834,7 +894,7 @@ app.get(['/api/complaints/:id', '/complaints/:id'], async (req, res) => {
 
     res.json({ success: true, complaint });
   } catch (error) {
-    console.error('Error fetching complaint:', error);
+    console.error('Error fetching complaint:', error.message || error);
     res.status(500).json({ success: false, message: 'Failed to fetch complaint' });
   }
 });

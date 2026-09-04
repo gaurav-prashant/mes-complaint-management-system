@@ -115,7 +115,10 @@ export default function SubmitComplaint() {
       });
       clearTimeout(timeoutId);
       
-      if (!response.ok) throw new Error('Network response was not ok');
+      const resData = await response.json().catch(() => ({}));
+      if (!response.ok || !resData.success) {
+        throw new Error(resData.message || 'Failed to submit complaint');
+      }
       
       setComplaintId(newComplaintId);
       setIsSuccess(true);
@@ -125,7 +128,7 @@ export default function SubmitComplaint() {
       if (error.name === 'AbortError') {
         alert('Connection timed out. Failed to submit complaint.');
       } else {
-        alert('Failed to submit complaint. Please try again.');
+        alert(`Failed to submit complaint: ${error.message}`);
       }
     } finally {
       setIsSubmitting(false);

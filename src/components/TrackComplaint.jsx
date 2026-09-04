@@ -38,7 +38,7 @@ export default function TrackComplaint() {
 
     try {
       const API_BASE = getApiBase();
-      const response = await fetch(`${API_BASE}/complaints`, { signal: controller.signal });
+      const response = await fetch(`${API_BASE}/complaints/track/${encodeURIComponent(number)}`, { signal: controller.signal });
       clearTimeout(timeoutId);
       
       let data;
@@ -49,15 +49,12 @@ export default function TrackComplaint() {
       }
 
       if (!response.ok || !data.success) {
-        throw new Error(data?.message || 'Network response was not ok');
+        throw new Error(data?.message || 'Failed to fetch tracking data');
       }
       
-      const allComplaints = data.complaints || [];
-      
-      const foundInDb = allComplaints.filter(c => c.mobile === number);
+      const foundInDb = data.complaints || [];
 
       if (foundInDb.length > 0) {
-        // deduplicate by complaintId just in case
         const uniqueResults = Array.from(new Map(foundInDb.map(item => [item.complaintId || item._id, item])).values());
         setResults(uniqueResults);
       }
@@ -68,7 +65,7 @@ export default function TrackComplaint() {
       if (err.name === 'AbortError') {
         setError('Connection timed out. Unable to fetch tracking data.');
       } else {
-        setError('Unable to fetch tracking data. Please try again later.');
+        setError(`Unable to fetch tracking data: ${err.message}`);
       }
     } finally {
       setIsLoading(false);
