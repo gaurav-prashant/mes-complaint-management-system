@@ -103,7 +103,7 @@ async function connectDB() {
   }
 }
 
-// ─── Ensure Default Admin Exists (hashed) ────────────────────────────────────
+// ─── Ensure Default Admin Exists (hashed & synchronized) ─────────────────────
 
 async function ensureAdminExists() {
   if (!adminsCollection) {
@@ -117,32 +117,64 @@ async function ensureAdminExists() {
   if (!adminEmail || !adminPassword) {
     console.error(
       '[Auth] ADMIN_EMAIL and/or ADMIN_PASSWORD are not set in environment variables. ' +
-      'Admin account cannot be seeded. Set these variables and restart the server.'
+      'Admin account cannot be seeded.'
     );
     return;
   }
 
   try {
-    const targetEmail = adminEmail.toLowerCase();
-    const existing = await adminsCollection.findOne({ email: targetEmail });
+    const targetEmail = adminEmail.trim().toLowerCase();
+
+    // Check if an existing admin account exists (by targetEmail, admin role, or first admin doc)
+    let existing = await adminsCollection.findOne({ email: targetEmail });
+    if (!existing) {
+      existing = await adminsCollection.findOne({ role: 'admin' });
+    }
+    if (!existing) {
+      existing = await adminsCollection.findOne({});
+    }
 
     if (existing) {
-      if (typeof existing.authVersion !== 'number') {
-        await adminsCollection.updateOne({ _id: existing._id }, { $set: { authVersion: 1 } });
+      const updates = {};
+      let credentialsChanged = false;
+
+      // 1. Email check
+      if ((existing.email || '').toLowerCase() !== targetEmail) {
+        updates.email = targetEmail;
+        credentialsChanged = true;
       }
-      console.log('[Auth] Admin account already exists — skipping seed.');
+
+      // 2. Password check (compare plain ADMIN_PASSWORD against stored bcrypt hash)
+      const isPasswordMatch = existing.passwordHash ? await bcrypt.compare(adminPassword, existing.passwordHash) : false;
+      if (!isPasswordMatch) {
+        updates.passwordHash = await bcrypt.hash(adminPassword, 12);
+        credentialsChanged = true;
+      }
+
+      // 3. Increment authVersion if credentials changed to invalidate old tokens
+      const currentAuthVersion = typeof existing.authVersion === 'number' ? existing.authVersion : 1;
+      if (credentialsChanged) {
+        updates.authVersion = currentAuthVersion + 1;
+        updates.updatedAt = new Date();
+      } else if (typeof existing.authVersion !== 'number') {
+        updates.authVersion = 1;
+      }
+
+      // 4. Apply updates only if changes were detected
+      if (Object.keys(updates).length > 0) {
+        await adminsCollection.updateOne({ _id: existing._id }, { $set: updates });
+        if (credentialsChanged) {
+          console.log('[Auth] Primary Admin account credentials synchronized with environment variables.');
+        } else {
+          console.log('[Auth] Admin account structure updated.');
+        }
+      } else {
+        console.log('[Auth] Admin account already synchronized — no changes needed.');
+      }
       return;
     }
 
-    // Check if there is an existing single admin document to update safely
-    const totalAdmins = await adminsCollection.countDocuments();
-    if (totalAdmins === 1) {
-      await adminsCollection.updateOne({}, { $set: { email: targetEmail, updatedAt: new Date() }, $setOnInsert: { authVersion: 1 } });
-      console.log('[Auth] Updated existing admin account email to match ADMIN_EMAIL.');
-      return;
-    }
-
-    // Hash with salt rounds = 12
+    // 5. No existing Admin found — seed brand new Admin account
     const passwordHash = await bcrypt.hash(adminPassword, 12);
 
     await adminsCollection.insertOne({
@@ -153,10 +185,9 @@ async function ensureAdminExists() {
       createdAt: new Date(),
     });
 
-    console.log('[Auth] Default admin account created successfully.');
-    // Never log the password or passwordHash
+    console.log('[Auth] Default Admin account seeded successfully.');
   } catch (err) {
-    console.error('[Auth] Failed to seed admin account:', err.message);
+    console.error('[Auth] Failed to seed/sync Admin account:', err.message);
   }
 }
 
