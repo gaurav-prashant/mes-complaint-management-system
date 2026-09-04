@@ -11,11 +11,13 @@ import dns from 'dns';
 
 dotenv.config();
 
-// Ensure public DNS fallback for SRV lookup on Windows environments
-try {
-  dns.setServers(['8.8.8.8', '1.1.1.1']);
-} catch (dnsErr) {
-  console.warn('[DB] Custom DNS setup warning:', dnsErr.message);
+// Ensure public DNS fallback for SRV lookup on Windows environments only
+if (process.platform === 'win32') {
+  try {
+    dns.setServers(['8.8.8.8', '1.1.1.1']);
+  } catch (dnsErr) {
+    console.warn('[DB] Custom DNS setup warning:', dnsErr.message);
+  }
 }
 
 const app = express();
@@ -84,7 +86,10 @@ async function connectDB() {
   }
   try {
     if (!client) {
-      client = new MongoClient(MONGO_URI);
+      client = new MongoClient(MONGO_URI, {
+        serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 5000,
+      });
       await client.connect();
     }
     db = client.db('mes_complaint_db');
