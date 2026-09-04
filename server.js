@@ -148,6 +148,9 @@ async function connectDB() {
       superAdminsCollection               = db.collection('superadmins');
       superAdminPasswordResetsCollection  = db.collection('superAdminPasswordResets');
 
+      await ensureAdminExists();
+      await ensureSuperAdminExists();
+
       console.log('[DB] MongoDB connected & verified successfully');
       return complaintsCollection;
     } catch (err) {
@@ -165,132 +168,65 @@ async function connectDB() {
 // ─── Ensure Default Admin Exists (hashed & synchronized) ─────────────────────
 
 async function ensureAdminExists() {
-  if (!adminsCollection) {
-    console.warn('[Auth] adminsCollection not available — skipping admin seed');
-    return;
-  }
+  if (!adminsCollection) return;
 
   const adminEmail    = process.env.ADMIN_EMAIL;
   const adminPassword = process.env.ADMIN_PASSWORD;
 
-  if (!adminEmail || !adminPassword) {
-    console.error(
-      '[Auth] ADMIN_EMAIL and/or ADMIN_PASSWORD are not set in environment variables. ' +
-      'Admin account cannot be seeded.'
-    );
-    return;
-  }
+  if (!adminEmail || !adminPassword) return;
 
   try {
-    const targetEmail = adminEmail.trim().toLowerCase();
+    const count = await adminsCollection.countDocuments({});
+    if (count === 0) {
+      const targetEmail  = adminEmail.trim().toLowerCase();
+      const passwordHash = await bcrypt.hash(adminPassword, 12);
 
-    // Check if an existing admin account exists (by targetEmail, admin role, or first admin doc)
-    let existing = await adminsCollection.findOne({ email: targetEmail });
-    if (!existing) {
-      existing = await adminsCollection.findOne({ role: 'admin' });
+      await adminsCollection.insertOne({
+        email: targetEmail,
+        passwordHash,
+        role: 'admin',
+        authVersion: 1,
+        createdAt: new Date(),
+      });
+      console.log('[Auth] Default Admin account seeded successfully.');
+    } else {
+      const existing = await adminsCollection.findOne({});
+      if (existing && typeof existing.authVersion !== 'number') {
+        await adminsCollection.updateOne({ _id: existing._id }, { $set: { authVersion: 1 } });
+      }
     }
-    if (!existing) {
-      existing = await adminsCollection.findOne({});
-    }
-
-    if (existing) {
-      const updates = {};
-      let credentialsChanged = false;
-
-      // 1. Email check
-      if ((existing.email || '').toLowerCase() !== targetEmail) {
-        updates.email = targetEmail;
-        credentialsChanged = true;
-      }
-
-      // 2. Password check (compare plain ADMIN_PASSWORD against stored bcrypt hash)
-      const isPasswordMatch = existing.passwordHash ? await bcrypt.compare(adminPassword, existing.passwordHash) : false;
-      if (!isPasswordMatch) {
-        updates.passwordHash = await bcrypt.hash(adminPassword, 12);
-        credentialsChanged = true;
-      }
-
-      // 3. Increment authVersion if credentials changed to invalidate old tokens
-      const currentAuthVersion = typeof existing.authVersion === 'number' ? existing.authVersion : 1;
-      if (credentialsChanged) {
-        updates.authVersion = currentAuthVersion + 1;
-        updates.updatedAt = new Date();
-      } else if (typeof existing.authVersion !== 'number') {
-        updates.authVersion = 1;
-      }
-
-      // 4. Apply updates only if changes were detected
-      if (Object.keys(updates).length > 0) {
-        await adminsCollection.updateOne({ _id: existing._id }, { $set: updates });
-        if (credentialsChanged) {
-          console.log('[Auth] Primary Admin account credentials synchronized with environment variables.');
-        } else {
-          console.log('[Auth] Admin account structure updated.');
-        }
-      } else {
-        console.log('[Auth] Admin account already synchronized — no changes needed.');
-      }
-      return;
-    }
-
-    // 5. No existing Admin found — seed brand new Admin account
-    const passwordHash = await bcrypt.hash(adminPassword, 12);
-
-    await adminsCollection.insertOne({
-      email: targetEmail,
-      passwordHash,
-      role: 'admin',
-      authVersion: 1,
-      createdAt: new Date(),
-    });
-
-    console.log('[Auth] Default Admin account seeded successfully.');
   } catch (err) {
-    console.error('[Auth] Failed to seed/sync Admin account:', err.message);
+    console.error('[Auth] Failed to seed Admin account:', err.message);
   }
 }
 
 // ─── Ensure Default SuperAdmin Exists (hashed) ───────────────────────────────
 
 async function ensureSuperAdminExists() {
-  if (!superAdminsCollection) {
-    console.warn('[Auth] superAdminsCollection not available — skipping superadmin seed');
-    return;
-  }
+  if (!superAdminsCollection) return;
 
   const saEmail    = (process.env.SUPERADMIN_EMAIL || 'superadmin@example.com').trim().toLowerCase();
   const saPassword = process.env.SUPERADMIN_PASSWORD || 'superadmin123';
 
   try {
-    const existingInSuper = await superAdminsCollection.findOne({ email: saEmail });
-    if (existingInSuper) {
-      if (typeof existingInSuper.authVersion !== 'number') {
-        await superAdminsCollection.updateOne({ _id: existingInSuper._id }, { $set: { authVersion: 1 } });
+    const count = await superAdminsCollection.countDocuments({});
+    if (count === 0) {
+      const passwordHash = await bcrypt.hash(saPassword, 12);
+
+      await superAdminsCollection.insertOne({
+        email: saEmail,
+        passwordHash,
+        role: 'superadmin',
+        authVersion: 1,
+        createdAt: new Date(),
+      });
+      console.log('[Auth] Default SuperAdmin account seeded successfully.');
+    } else {
+      const existing = await superAdminsCollection.findOne({});
+      if (existing && typeof existing.authVersion !== 'number') {
+        await superAdminsCollection.updateOne({ _id: existing._id }, { $set: { authVersion: 1 } });
       }
-      console.log('[Auth] SuperAdmin account already exists — skipping seed.');
-      return;
     }
-
-    const existingInAdmins = await adminsCollection.findOne({ email: saEmail, role: 'superadmin' });
-    if (existingInAdmins) {
-      if (typeof existingInAdmins.authVersion !== 'number') {
-        await adminsCollection.updateOne({ _id: existingInAdmins._id }, { $set: { authVersion: 1 } });
-      }
-      console.log('[Auth] SuperAdmin account already exists in admins collection.');
-      return;
-    }
-
-    const passwordHash = await bcrypt.hash(saPassword, 12);
-
-    await superAdminsCollection.insertOne({
-      email: saEmail,
-      passwordHash,
-      role: 'superadmin',
-      authVersion: 1,
-      createdAt: new Date(),
-    });
-
-    console.log('[Auth] Default SuperAdmin account created successfully.');
   } catch (err) {
     console.error('[Auth] Failed to seed SuperAdmin account:', err.message);
   }
@@ -994,7 +930,7 @@ app.get(['/api/complaints/:id', '/complaints/:id'], async (req, res) => {
 
 app.post(['/api/super-admin/login', '/super-admin/login'], async (req, res) => {
   const { email, password } = req.body || {};
-  console.log(`[SuperAdmin Login Attempt] Email received: "${email || ''}"`);
+  console.log(`[SuperAdmin Login Attempt] Method: ${req.method} | Path: ${req.url}`);
 
   const FAIL_MSG = 'Invalid email or password';
 
@@ -1011,25 +947,25 @@ app.post(['/api/super-admin/login', '/super-admin/login'], async (req, res) => {
   }
 
   try {
-    const targetEmail = email.trim().toLowerCase();
+    const targetEmail = (email || '').trim().toLowerCase();
     let superadmin = await superAdminsCollection.findOne({ email: targetEmail });
     if (!superadmin && adminsCollection) {
       superadmin = await adminsCollection.findOne({ email: targetEmail, role: 'superadmin' });
     }
 
     if (!superadmin || superadmin.role !== 'superadmin') {
-      console.log(`[SuperAdmin Login Failed] No superadmin found for email: "${targetEmail}"`);
+      console.log('[SuperAdmin Login Failed] No superadmin account matching submitted email');
       return res.status(401).json({ success: false, message: FAIL_MSG });
     }
 
     const passwordMatch = await bcrypt.compare(password, superadmin.passwordHash);
     if (!passwordMatch) {
-      console.log(`[SuperAdmin Login Failed] Password mismatch for email: "${targetEmail}"`);
+      console.log('[SuperAdmin Login Failed] Password mismatch for submitted credentials');
       return res.status(401).json({ success: false, message: FAIL_MSG });
     }
 
     const token = signSuperAdminToken(superadmin);
-    console.log(`[SuperAdmin Login Success] Auth successful for email: "${targetEmail}"`);
+    console.log('[SuperAdmin Login Success] SuperAdmin authentication successful');
     return res.json({ success: true, token });
   } catch (err) {
     console.error('[SuperAdmin Login Error]', err.message);
