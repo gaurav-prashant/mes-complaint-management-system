@@ -487,7 +487,7 @@ function signSuperAdminToken(superadmin) {
 
 app.post(['/api/admin/login', '/admin/login'], async (req, res) => {
   const { email, password } = req.body || {};
-  console.log(`[Admin Login Attempt] Method: ${req.method} | Path: ${req.url} | Email received: "${email || ''}"`);
+  console.log(`[Admin Login Attempt] Method: ${req.method} | Path: ${req.url}`);
 
   // Generic failure message — never reveal which field was wrong
   const FAIL_MSG = 'Invalid email or password';
@@ -507,24 +507,25 @@ app.post(['/api/admin/login', '/admin/login'], async (req, res) => {
   }
 
   try {
-    const admin = await adminsCollection.findOne({ email });
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    const admin = await adminsCollection.findOne({ email: normalizedEmail });
 
     if (!admin) {
-      console.log(`[Admin Login Failed] No admin found for email: "${email}"`);
+      console.log('[Admin Login Failed] No admin account matching submitted email');
       return res.status(401).json({ success: false, message: FAIL_MSG });
     }
 
     const passwordMatch = await bcrypt.compare(password, admin.passwordHash);
 
     if (!passwordMatch) {
-      console.log(`[Admin Login Failed] Password mismatch for email: "${email}"`);
+      console.log('[Admin Login Failed] Password mismatch for submitted credentials');
       return res.status(401).json({ success: false, message: FAIL_MSG });
     }
 
     // Sign JWT — never include passwordHash in payload
     const token = signAdminToken(admin);
 
-    console.log(`[Admin Login Success] Auth successful for email: "${email}"`);
+    console.log('[Admin Login Success] Admin authentication successful');
     // Return token only — never return passwordHash or password
     return res.json({ success: true, token });
   } catch (err) {
